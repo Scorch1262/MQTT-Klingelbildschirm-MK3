@@ -1,4 +1,4 @@
-# Klingel-Dashboard Brume 2 – v4.0.0
+# Klingel-Dashboard Brume 2 – v4.0.1
 
 Klingel-Dashboard für den **GL.iNet Brume 2 (GL-MT2500)**. Es läuft im Autostart der
 Brume und ersetzt den PC (v2.x) bzw. das RP2350-Board (v3.x):
@@ -32,7 +32,7 @@ Browser können RTSP nicht abspielen, das H.264-Video muss vorher umgewandelt we
 * **Wichtig:** Das `ffmpeg` aus den OpenWrt-Paketquellen ist **ohne H.264-Decoder**
   gebaut (Patent-Option ist dort abgeschaltet). Der Installer lädt deshalb ein
   statisch gebautes ffmpeg (johnvansickle.com, ARM64) nach
-  `/root/Klingel-Dashboard-Brume2/bin/ffmpeg`. Dieses kann auch H.265.
+  `/root/Klingel-Dashboard/bin/ffmpeg`. Dieses kann auch H.265.
 
 Kommt im Browser trotzdem kein Video an, wechselt das Dashboard automatisch auf
 **Einzelbilder** (`/snapshot.jpg`, mehrere pro Sekunde).
@@ -41,19 +41,19 @@ Kommt im Browser trotzdem kein Video an, wechselt das Dashboard automatisch auf
 
 ## Installation
 
-1. Die Datei `klingel-dashboard-brume2_v4.0.0.sh` auf die Brume kopieren,
+1. Die Datei `klingel-dashboard-brume2_v4.0.1.sh` auf die Brume kopieren,
    z. B. mit WinSCP (Protokoll SCP, Benutzer `root`) nach `/root/` oder per
    ```
-   scp -O klingel-dashboard-brume2_v4.0.0.sh root@<IP-der-Brume>:/root/
+   scp -O klingel-dashboard-brume2_v4.0.1.sh root@<IP-der-Brume>:/root/
    ```
 2. Per SSH auf der Brume anmelden und starten:
    ```
    ssh root@<IP-der-Brume>
-   sh /root/klingel-dashboard-brume2_v4.0.0.sh
+   sh /root/klingel-dashboard-brume2_v4.0.1.sh
    ```
 3. Der Installer
    * installiert bei Bedarf **python3** (`opkg`),
-   * kopiert das Programm nach `/root/Klingel-Dashboard-Brume2`,
+   * kopiert das Programm nach `/root/Klingel-Dashboard`,
    * lädt **ffmpeg mit H.264** (ca. 25 MB),
    * richtet den **Autostart** ein (`/etc/init.d/klingel-dashboard`, startet nach jedem
      Neustart und nach Abstürzen automatisch neu),
@@ -65,9 +65,33 @@ Kommt im Browser trotzdem kein Video an, wechselt das Dashboard automatisch auf
 
 **Update:** neue Paketdatei genauso ausführen. Die `config.ini` bleibt erhalten.
 
+### Alles in einem Ordner
+
+Nach der Installation liegt alles in `/root/Klingel-Dashboard`, neben den anderen
+Programmen (z. B. `Outfit-Dashboard`, `mqtt-dashboard`):
+
+```
+/root/Klingel-Dashboard/
+├── klingel_server.py        Programm
+├── config.ini               Einstellungen (lesbar, von Hand änderbar)
+├── web/                     Dashboard- und Einrichtungsseite
+├── bin/ffmpeg               ffmpeg mit H.264/H.265
+├── logs/klingel.log         Betriebsprotokoll (max. 256 KB, dann klingel.log.1)
+├── logs/install.log         Protokoll der letzten Installation
+├── files/klingel-dashboard.init   Autostart-Skript
+├── paket/                   das ausgeführte Installationspaket (wird hierher verschoben)
+├── install.sh  uninstall.sh  ANLEITUNG.md  VERSION
+```
+
+Außerhalb des Ordners gibt es nur den Verweis `/etc/init.d/klingel-dashboard`
+→ `files/klingel-dashboard.init`. OpenWrt startet Dienste nur von dort, deshalb ist
+er für den Autostart nötig. Die Version 4.0.0 hieß noch `Klingel-Dashboard-Brume2`;
+der Installer übernimmt `config.ini` und ffmpeg daraus und entfernt den alten Ordner.
+
 **Brume ohne Internet:** `ffmpeg-release-arm64-static.tar.xz` von
 <https://johnvansickle.com/ffmpeg/> auf dem PC laden und in denselben Ordner wie die
-Paketdatei legen. Der Installer nimmt dann das lokale Archiv.
+Paketdatei (oder nach `/root/Klingel-Dashboard/paket/`) legen. Der Installer nimmt
+dann das lokale Archiv.
 
 ### Firewall
 
@@ -83,10 +107,11 @@ auch über den **WAN-Port** erreichbar sind, legt das Programm eine Firewall-Reg
 |-----------------------------------------------|---------|
 | `/etc/init.d/klingel-dashboard restart`       | Dienst neu starten |
 | `/etc/init.d/klingel-dashboard stop` / `start`| anhalten / starten |
-| `logread -e klingel`                          | Protokoll ansehen (Kamera-, MQTT-, Klingelmeldungen) |
-| `sh /root/Klingel-Dashboard-Brume2/uninstall.sh` | Autostart und Firewall-Regel entfernen |
+| `tail -f /root/Klingel-Dashboard/logs/klingel.log` | Protokoll ansehen (Kamera-, MQTT-, Klingelmeldungen) |
+| `sh /root/Klingel-Dashboard/uninstall.sh` | Autostart und Firewall-Regel entfernen (Ordner bleibt) |
+| `sh /root/Klingel-Dashboard/uninstall.sh --alles` | zusätzlich den ganzen Ordner löschen |
 
-Die Einstellungen stehen lesbar in `/root/Klingel-Dashboard-Brume2/config.ini`.
+Die Einstellungen stehen lesbar in `/root/Klingel-Dashboard/config.ini`.
 Nach einer Änderung von Hand: `/etc/init.d/klingel-dashboard restart`.
 
 ---
@@ -155,6 +180,11 @@ ist. Für Ton bei gesperrtem iPad: Lautlos-Schalter aus, Seite im Vordergrund la
 ---
 
 ## Versionsverlauf
+
+* **v4.0.1** – alles in einem Ordner `/root/Klingel-Dashboard`
+  * Ordner wird als Erstes angelegt (auch bei Abbruch sichtbar, mit `logs/install.log`)
+  * Betriebsprotokoll `logs/klingel.log`, Autostart-Skript als Verweis aus dem Ordner
+  * Installationspaket wird nach `paket/` verschoben, `uninstall.sh --alles`
 
 * **v4.0.0** – Version für GL.iNet Brume 2 (Python, nur Standardbibliothek)
   * Kamerabild über ffmpeg → MJPEG (iOS-9-tauglich), automatischer Einzelbild-Rückfall

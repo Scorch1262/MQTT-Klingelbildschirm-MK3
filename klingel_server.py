@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Klingel-Dashboard Brume 2  –  v4.0.0
+Klingel-Dashboard Brume 2  –  v4.0.1
 ====================================
 
 Laeuft auf einem GL.iNet Brume 2 (GL-MT2500, OpenWrt) im Autostart und stellt bereit:
@@ -36,7 +36,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
 APP_NAME = "Klingel-Dashboard Brume 2"
-APP_VERSION = "4.0.0"
+APP_VERSION = "4.0.1"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get("KLINGEL_CONFIG") or os.path.join(BASE_DIR, "config.ini")
@@ -51,9 +51,25 @@ CAM_STALL_S = 12.0           # kein neues Bild -> ffmpeg neu starten
 START_TIME = time.time()
 
 
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+LOG_FILE = os.path.join(LOG_DIR, "klingel.log")
+LOG_MAX = 256 * 1024          # danach -> klingel.log.1 (schont den Flash)
+_LOG_LOCK = threading.Lock()
+
+
 def log(tag, msg):
-    sys.stdout.write("[%s] [%s] %s\n" % (time.strftime("%H:%M:%S"), tag, msg))
+    line = "[%s] [%s] %s\n" % (time.strftime("%H:%M:%S"), tag, msg)
+    sys.stdout.write(line)
     sys.stdout.flush()
+    with _LOG_LOCK:
+        try:
+            os.makedirs(LOG_DIR, exist_ok=True)
+            if os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) > LOG_MAX:
+                os.replace(LOG_FILE, LOG_FILE + ".1")
+            with open(LOG_FILE, "a", encoding="utf-8") as fh:
+                fh.write(time.strftime("%Y-%m-%d ") + line)
+        except OSError:
+            pass
 
 
 # ═══════════════════════════════════════════════════════════════════════════

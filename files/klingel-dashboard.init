@@ -1,13 +1,13 @@
 #!/bin/sh /etc/rc.common
 # Klingel-Dashboard Brume 2 – Autostart (procd)
 # start/stop/restart:  /etc/init.d/klingel-dashboard start|stop|restart
-# Log ansehen:         logread -e klingel
+# Log ansehen:         tail -f /root/Klingel-Dashboard/logs/klingel.log  (oder logread -e klingel)
 
 START=99
 STOP=10
 USE_PROCD=1
 
-APP_DIR=/root/Klingel-Dashboard-Brume2
+APP_DIR=/root/Klingel-Dashboard
 
 start_service() {
 	procd_open_instance klingel
