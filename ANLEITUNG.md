@@ -1,18 +1,19 @@
-# Klingel-Dashboard Brume 2 – v4.1.0
+# Klingel-Dashboard Brume 2 – v4.2.0
 
 Klingel-Dashboard für den **GL.iNet Brume 2 (GL-MT2500)**. Es läuft im Autostart der
 Brume und ersetzt den PC (v2.x) bzw. das RP2350-Board (v3.x):
 
 | Port (Standard) | Seite        | Inhalt |
 |-----------------|--------------|--------|
-| **8081**        | Dashboard 1  | Kamerabild, Klingel-Symbole, Öffner-Taste |
-| **8082**        | Dashboard 2  | gleiche Oberfläche, **dasselbe Kamerabild**, eigene Klingel-Topics |
+| **8081**        | Dashboard 1  | Kamerabild, Klingel-Symbol, Öffner-Taste |
+| **8082**        | Dashboard 2  | gleiche Oberfläche, **dasselbe Kamerabild**, eigenes Klingel-Topic |
 | **8083**        | Einrichtung  | Broker, Öffner, Topics, Kameras, Ports, Kameratest |
 
 * Beide Dashboards senden beim Drücken der Öffnen-Taste **denselben MQTT-Befehl an
   denselben Broker** (wiederholt, solange gedrückt; beim Loslassen der Loslassen-Befehl).
-* Jedes Dashboard reagiert auf **eigene Klingel-Topics** (bis zu 3 Symbole, `+`/`#` erlaubt,
-  leere Payload = jede Nachricht). Der Klingelton startet ohne „Tippen zum Starten“.
+* Jedes Dashboard klingelt auf **genau einem eigenen Topic** (z. B. Dashboard 1 auf
+  `doorbell/bell1`, Dashboard 2 auf `doorbell/bell2`; `+`/`#` erlaubt, leere Payload =
+  jede Nachricht auf dem Topic). Der Klingelton startet ohne „Tippen zum Starten“.
 * Läuft auch auf dem **iPad mini 1 (iOS 9)**: reines ES5-JavaScript, Kamerabild als MJPEG.
 * Port 80/443 bleiben frei für die GL.iNet-Oberfläche.
 
@@ -41,15 +42,15 @@ Kommt im Browser trotzdem kein Video an, wechselt das Dashboard automatisch auf
 
 ## Installation
 
-1. Die Datei `klingel-dashboard-brume2_v4.1.0.sh` auf die Brume kopieren,
+1. Die Datei `klingel-dashboard-brume2_v4.2.0.sh` auf die Brume kopieren,
    z. B. mit WinSCP (Protokoll SCP, Benutzer `root`) nach `/root/` oder per
    ```
-   scp -O klingel-dashboard-brume2_v4.1.0.sh root@<IP-der-Brume>:/root/
+   scp -O klingel-dashboard-brume2_v4.2.0.sh root@<IP-der-Brume>:/root/
    ```
 2. Per SSH auf der Brume anmelden und starten:
    ```
    ssh root@<IP-der-Brume>
-   sh /root/klingel-dashboard-brume2_v4.1.0.sh
+   sh /root/klingel-dashboard-brume2_v4.2.0.sh
    ```
 3. Der Installer
    * installiert bei Bedarf **python3** (`opkg`),
@@ -152,6 +153,24 @@ Die vollständige ffmpeg-Ausgabe zeigt der Knopf **Kamera mit diesen Werten test
 
 ---
 
+## Dauerbetrieb auf den beiden iPads (6. Generation)
+
+Die Seiten sind für den Dauerbetrieb auf einem iPad im Querformat (1024×768) ausgelegt.
+
+1. Seite in Safari öffnen (`http://<IP-der-Brume>:8081` bzw. `:8082`) →
+   Teilen → **Zum Home-Bildschirm**. Vom Home-Bildschirm gestartet läuft sie im Vollbild.
+2. **Einstellungen → Anzeige & Helligkeit → Automatische Sperre → Nie**, iPad am Netzteil.
+3. **Einstellungen → Bedienungshilfen → Geführter Zugriff** einschalten und in der Seite
+   dreimal die Home-Taste drücken – dann bleibt das iPad fest auf dem Dashboard.
+4. Nach dem Öffnen **einmal irgendwo auf die Seite tippen**. Safari lässt Ton erst nach
+   einer Berührung zu (das lässt sich auf dem iPad nicht abschalten). Solange der Ton
+   gesperrt ist, blinkt oben **„TON AUS – BITTE ANTIPPEN“**. Danach bleibt der Ton frei,
+   solange die Seite offen ist; die Seite lädt sich dafür nie selbst neu.
+5. Lautstärke hoch, Lautlos-Schalter aus.
+
+Damit das Bild über Tage stabil bleibt, verbindet die Seite den Videostrom alle
+20 Minuten unauffällig neu und bei Aussetzern sofort.
+
 ## Audio
 
 Der Klingelton wird im Browser erzeugt und startet automatisch. Wo der Browser Ton
@@ -183,6 +202,12 @@ ist. Für Ton bei gesperrtem iPad: Lautlos-Schalter aus, Seite im Vordergrund la
 ---
 
 ## Versionsverlauf
+
+* **v4.2.0** – ein Klingel-Topic je Dashboard, Dauerbetrieb auf iPad (6. Gen.)
+  * je Webseite genau ein Klingel-Signal (Topic + Payload), ein Klingel-Symbol
+  * Hinweis „TON AUS – BITTE ANTIPPEN“, solange Safari den Ton sperrt
+  * Videostrom wird alle 20 min neu verbunden (stabil im Dauerbetrieb)
+  * veraltete Einträge in der config.ini werden entfernt
 
 * **v4.1.0** – eine Kamera für beide Dashboards
   * nur noch ein RTSP-Stream (Abschnitt `[kamera]` in der config.ini), ein ffmpeg-Prozess

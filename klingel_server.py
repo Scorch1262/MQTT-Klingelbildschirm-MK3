@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Klingel-Dashboard Brume 2  –  v4.1.0
+Klingel-Dashboard Brume 2  –  v4.2.0
 ====================================
 
 Laeuft auf einem GL.iNet Brume 2 (GL-MT2500, OpenWrt) im Autostart und stellt bereit:
@@ -9,7 +9,7 @@ Laeuft auf einem GL.iNet Brume 2 (GL-MT2500, OpenWrt) im Autostart und stellt be
   * Dashboard 1 (Standard-Port 8081) und Dashboard 2 (Standard-Port 8082)
       - dasselbe Kamerabild auf beiden (ein RTSP-Stream -> ffmpeg -> MJPEG, auch iOS 9)
       - Türöffner-Taste: beide Dashboards senden denselben MQTT-Befehl an denselben Broker
-      - bis zu 3 Klingel-Symbole je Dashboard mit eigenen MQTT-Topics, Klingelton im Browser
+      - je Dashboard ein eigenes Klingel-Topic, Klingelton im Browser
   * Einrichtungsseite (Standard-Port 8083): Broker, Topics, Kameras, Ports, Kameratest
 
 Nur Python-Standardbibliothek (Python >= 3.7), dazu ffmpeg mit H.264-Decoder.
@@ -36,14 +36,14 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
 APP_NAME = "Klingel-Dashboard Brume 2"
-APP_VERSION = "4.1.0"
+APP_VERSION = "4.2.0"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get("KLINGEL_CONFIG") or os.path.join(BASE_DIR, "config.ini")
 WEB_DIR = os.path.join(BASE_DIR, "web")
 
 NUM_SITES = 2
-NUM_BELLS = 3
+NUM_BELLS = 1                # je Dashboard genau ein Klingel-Topic
 BELL_ACTIVE_S = 3.0          # Klingel-Symbol bleibt 3 s aktiv
 CAM_LINGER_S = 30.0          # Kamera läuft nach dem letzten Zuschauer noch 30 s weiter
 CAM_FIRST_FRAME_S = 20.0     # so lange darf das erste Bild dauern
@@ -139,10 +139,10 @@ def build_schema():
         ]
         for b in range(1, NUM_BELLS + 1):
             s += [
-                _f(sec, "klingel%d_name" % b, "str", "B%d" % b, "Klingel %d Name" % b),
+                _f(sec, "klingel%d_name" % b, "str", "Klingel", "Name des Klingel-Symbols"),
                 _f(sec, "klingel%d_topic" % b, "str", ("doorbell/bell%d" % n) if b == 1 else "",
-                   "Klingel %d Topic" % b, "leer = Symbol ausgeblendet; + und # erlaubt"),
-                _f(sec, "klingel%d_payload" % b, "str", "RING", "Klingel %d Payload" % b,
+                   "Klingel-Topic", "MQTT-Topic, das dieses Dashboard klingeln lässt; + und # erlaubt"),
+                _f(sec, "klingel%d_payload" % b, "str", "RING", "Klingel-Payload",
                    "leer = jede Nachricht auf dem Topic klingelt"),
             ]
     return s
@@ -239,9 +239,11 @@ def load_config():
     if raw is None:
         save_config(cfg)
         log("CFG", "config.ini neu angelegt: %s" % CONFIG_PATH)
-    elif migrated:
+    elif migrated or any(k not in cfg for k in raw):
+        # veraltete Eintraege (z. B. klingel2/klingel3 aus v4.1) entfernen
         save_config(cfg)
-        log("CFG", "Kamera-Einstellungen von Dashboard 1 als gemeinsame Kamera übernommen")
+        log("CFG", "Kamera-Einstellungen von Dashboard 1 als gemeinsame Kamera übernommen" if migrated
+            else "config.ini auf aktuelle Version gebracht")
     for p in problems:
         log("CFG", "WARNUNG %s -> Standardwert" % p)
     return cfg

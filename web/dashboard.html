@@ -43,6 +43,9 @@ header h1 span.acc { color: #ff9142; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #ff5d5d; display: inline-block; }
 .dot.on { background: #3ddc97; box-shadow: 0 0 6px #3ddc97; }
 .lbl { font-size: 10px; color: #8891a0; letter-spacing: 0.05em; margin-right: 6px; }
+.audio-hint { font-size: 10px; letter-spacing: 0.08em; color: #0a0c0f; background: #ff9142; border-radius: 20px; padding: 3px 10px; margin-right: 8px;
+  -webkit-animation: blink 1.6s ease-in-out infinite; animation: blink 1.6s ease-in-out infinite; }
+@-webkit-keyframes blink { 50% { opacity: 0.45; } } @keyframes blink { 50% { opacity: 0.45; } }
 .clock { font-size: 12px; color: #8891a0; margin-left: 12px; }
 
 /* ── Layout ── */
@@ -158,6 +161,7 @@ header h1 span.acc { color: #ff9142; }
   <div class="hdr-right mono">
     <span class="dot" id="mqttDot"></span><span class="lbl">MQTT</span>
     <span class="dot" id="camDot"></span><span class="lbl">CAM</span>
+    <span class="audio-hint" id="audioHint" style="display:none">TON AUS – BITTE ANTIPPEN</span>
     <span class="dot" id="audioDot"></span><span class="lbl">AUDIO</span>
     <span class="clock" id="clock">--:--:--</span>
     <span class="lbl">v{{VERSION}}</span>
@@ -267,6 +271,7 @@ var actx = null, audioLogged = '';
 function audioOk() { return !!actx && actx.state === 'running'; }
 function audioDot() {
   setClass($('audioDot'), 'on', audioOk());
+  $('audioHint').style.display = (AC && !audioOk()) ? '' : 'none';
   var st = actx ? actx.state : 'none';
   if (st !== audioLogged) {
     audioLogged = st;
@@ -407,6 +412,9 @@ function showFrame(on) {
 }
 function offlineText(t, h) { $('offText').innerHTML = ''; $('offText').appendChild(document.createTextNode(t)); $('offHint').innerHTML = ''; $('offHint').appendChild(document.createTextNode(h || '')); }
 
+/* Dauerbetrieb auf dem iPad: Safari hält einen MJPEG-Strom über viele Stunden nicht
+   zuverlässig – alle 20 min neu verbinden (ohne Seiten-Neuladen, Ton bleibt freigegeben). */
+setInterval(function () { if (camMode === 'mjpeg' && CFG.cam && !document.hidden) startMjpeg(); }, 20 * 60 * 1000);
 function startMjpeg() {
   camMode = 'mjpeg';
   mjpegStarted = now();

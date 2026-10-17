@@ -161,9 +161,9 @@ function simpleSection(sec, title, layout) {
 function siteCard(n) {
   var s = 'dashboard' + n, h = '<div class="row">';
   h += input(F(s, 'port'), 'w25') + input(F(s, 'titel'), 'w75') + '</div>';
-  h += '<div class="sub">Klingeln · leeres Topic = ausgeblendet · leere Payload = jede Nachricht</div>';
+  h += '<div class="sub">Klingel-Signal · ein Topic · leere Payload = jede Nachricht auf dem Topic</div>';
   for (var b = 1; b <= NUM_BELLS; b++) {
-    h += '<div class="bellrow">' + input(F(s, 'klingel' + b + '_name'), 'b1', 'Name') + input(F(s, 'klingel' + b + '_topic'), 'b2', 'Topic ' + b) +
+    h += '<div class="bellrow">' + input(F(s, 'klingel' + b + '_name'), 'b1', 'Name') + input(F(s, 'klingel' + b + '_topic'), 'b2', 'Topic') +
       input(F(s, 'klingel' + b + '_payload'), 'b3', 'Payload') +
       '<div class="f b4"><button class="btn mini" type="button" onclick="testBell(' + n + ',' + b + ')">Test</button></div></div>';
   }
