@@ -9,7 +9,7 @@ OUT=dist/klingel-dashboard-brume2_v$VERSION.sh
 mkdir -p dist
 TMP=$(mktemp -d)
 mkdir -p "$TMP/Klingel-Dashboard"
-cp -r klingel_server.py web files install.sh uninstall.sh ANLEITUNG.md VERSION "$TMP/Klingel-Dashboard/"
+cp -r klingel_server.py web files install.sh uninstall.sh ANLEITUNG.md README.md VERSION "$TMP/Klingel-Dashboard/"
 cat > "$OUT" <<EOF
 #!/bin/sh
 # Klingel-Dashboard Brume 2 v$VERSION – Installationspaket (selbstentpackend)

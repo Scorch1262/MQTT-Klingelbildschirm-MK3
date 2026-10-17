@@ -67,7 +67,7 @@ if [ "$SRC_DIR" != "$APP_DIR" ]; then
 	cp "$SRC_DIR/klingel_server.py" "$APP_DIR/" || die "Kopieren fehlgeschlagen"
 	cp "$SRC_DIR/web/"*.html "$APP_DIR/web/"
 	cp "$SRC_DIR/files/"* "$APP_DIR/files/"
-	for f in ANLEITUNG.md VERSION install.sh uninstall.sh; do
+	for f in ANLEITUNG.md README.md VERSION install.sh uninstall.sh; do
 		[ -f "$SRC_DIR/$f" ] && cp "$SRC_DIR/$f" "$APP_DIR/"
 	done
 fi
