@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Klingel-Dashboard Brume 2  –  v4.2.0
+Klingel-Dashboard Brume 2  –  v4.2.1
 ====================================
 
 Laeuft auf einem GL.iNet Brume 2 (GL-MT2500, OpenWrt) im Autostart und stellt bereit:
@@ -18,6 +18,7 @@ Konfiguration: config.ini im Programmordner (menschenlesbar).
 
 import base64
 import json
+import math
 import os
 import re
 import shutil
@@ -36,7 +37,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
 APP_NAME = "Klingel-Dashboard Brume 2"
-APP_VERSION = "4.2.0"
+APP_VERSION = "4.2.1"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get("KLINGEL_CONFIG") or os.path.join(BASE_DIR, "config.ini")
@@ -1134,6 +1135,41 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 pass
 
+    def _ranged(self, data, ctype):
+        """Datei mit Range-Unterstuetzung (Safari auf iPad verlangt das fuer Audio)."""
+        n = len(data)
+        rng = self.headers.get("Range", "")
+        m = re.match(r"bytes=(\d*)-(\d*)$", rng.strip())
+        if m and (m.group(1) or m.group(2)):
+            if m.group(1):
+                a = int(m.group(1))
+                b = int(m.group(2)) if m.group(2) else n - 1
+            else:
+                a, b = max(0, n - int(m.group(2))), n - 1
+            b = min(b, n - 1)
+            if a > b:
+                self.send_response(416)
+                self.send_header("Content-Range", "bytes */%d" % n)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            part = data[a:b + 1]
+            self.send_response(206)
+            self.send_header("Content-Range", "bytes %d-%d/%d" % (a, b, n))
+        else:
+            part = data
+            self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Content-Length", str(len(part)))
+        self.send_header("Cache-Control", "max-age=3600")
+        self.end_headers()
+        if self.command != "HEAD":
+            try:
+                self.wfile.write(part)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
     def _json(self, obj, code=200):
         self._send(code, json.dumps(obj, ensure_ascii=False), "application/json; charset=utf-8")
 
@@ -1246,6 +1282,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, html, "text/html; charset=utf-8")
         if p == "/stream.mjpg":
             return self._mjpeg(cam)
+        if p == "/klingel.wav":
+            return self._ranged(DOORBELL_WAV, "audio/wav")
         if p == "/snapshot.jpg":
             return self._snapshot(cam)
         if p == "/api/config":
@@ -1349,6 +1387,41 @@ class Handler(BaseHTTPRequestHandler):
             schedule_restart()
             return
         self._send(404, "Nicht gefunden")
+
+
+def make_doorbell_wav():
+    """Klingelton als WAV (22,05 kHz, 16 Bit, mono): 0,4 s Stille + Ding-Dong x2.
+    Die Stille am Anfang erlaubt das unhoerbare Freischalten auf dem iPad."""
+    import io
+    import wave
+    sr = 22050
+    lead = 0.4
+    notes = [(1047, 0.00, 0.80), (784, 0.45, 0.75), (1047, 2.20, 0.70), (784, 2.65, 0.70)]
+    total = int(sr * (lead + 4.8))
+    buf = [0.0] * total
+    for freq, start, vol in notes:
+        s0 = int(sr * (lead + start))
+        for i in range(int(sr * 2.0)):
+            j = s0 + i
+            if j >= total:
+                break
+            t = i / float(sr)
+            env = min(1.0, t / 0.01) * math.exp(-t * 3.8)
+            buf[j] += vol * env * (math.sin(2 * math.pi * freq * t) + 0.18 * math.sin(2 * math.pi * freq * 2.76 * t))
+    peak = max(abs(v) for v in buf) or 1.0
+    scale = 0.9 * 32767 / peak
+    frames = struct.pack("<%dh" % total, *[int(v * scale) for v in buf])
+    out = io.BytesIO()
+    w = wave.open(out, "wb")
+    w.setnchannels(1)
+    w.setsampwidth(2)
+    w.setframerate(sr)
+    w.writeframes(frames)
+    w.close()
+    return out.getvalue()
+
+
+DOORBELL_WAV = None
 
 
 def _html_escape(s):
@@ -1462,12 +1535,13 @@ def on_signal(signum, frame):
 
 
 def main():
-    global MQTT, CAMERA
+    global MQTT, CAMERA, DOORBELL_WAV
     signal.signal(signal.SIGTERM, on_signal)
     signal.signal(signal.SIGINT, on_signal)
     log("SYS", "%s v%s startet (Python %s)" % (APP_NAME, APP_VERSION, sys.version.split()[0]))
     log("SYS", "Konfiguration: %s" % CONFIG_PATH)
     find_ffmpeg()
+    DOORBELL_WAV = make_doorbell_wav()
 
     CAMERA = Camera()
     CAMERA.start()
