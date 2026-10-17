@@ -1,1 +1,0 @@
-# MQTT-Klingelbildschirm-MK3

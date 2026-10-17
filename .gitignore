@@ -1,0 +1,4 @@
+dist/
+config.ini
+bin/
+__pycache__/

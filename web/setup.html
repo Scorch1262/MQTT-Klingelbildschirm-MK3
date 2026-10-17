@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Klingel – Einrichtung</title>
+<style>
+* { -webkit-box-sizing: border-box; box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #0a0c0f; color: #e5e8ec; font-family: 'Inter', 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif; font-size: 14px; }
+.mono { font-family: 'JetBrains Mono', Menlo, Consolas, monospace; }
+header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 10; height: 52px;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between;
+  padding: 0 20px; border-bottom: 1px solid #242a33; background: #0d1014;
+}
+header h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap; }
+header h1 span { color: #ff9142; }
+.hdr { font-size: 10px; color: #8891a0; }
+.hdr > * { margin-left: 6px; vertical-align: middle; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #ff5d5d; display: inline-block; }
+.dot.on { background: #3ddc97; box-shadow: 0 0 6px #3ddc97; }
+
+main { max-width: 1240px; margin: 0 auto; padding: 68px 14px 110px; }
+.grid { overflow: hidden; margin: 0 -7px; }
+.col { float: left; width: 50%; padding: 0 7px; }
+@media (max-width: 860px) { .col { float: none; width: 100%; } }
+.card { background: #12151a; border: 1px solid #242a33; border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
+.card-head {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid #242a33; background: #171b21;
+}
+.card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: #8891a0; }
+.card-head a { font-size: 11px; color: #ff9142; text-decoration: none; }
+.card-body { padding: 14px; }
+.f { display: block; margin-bottom: 10px; }
+.f > span { display: block; font-size: 11px; color: #8891a0; letter-spacing: 0.3px; margin-bottom: 4px; }
+.f small { display: block; font-size: 10px; color: #5f6876; margin-top: 3px; line-height: 1.4; }
+input[type=text], input[type=number], input[type=password], select {
+  width: 100%; background: #0a0c0f; color: #e5e8ec; border: 1px solid #242a33; border-radius: 7px;
+  padding: 8px 10px; font-size: 12px; outline: none; -webkit-appearance: none;
+  font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
+}
+input:focus, select:focus { border-color: #ff9142; }
+.chk { display: block; font-size: 12px; margin-bottom: 10px; cursor: pointer; }
+.chk input { margin-right: 8px; vertical-align: middle; }
+.chk small { display: block; font-size: 10px; color: #5f6876; margin: 3px 0 0 22px; }
+.row { overflow: hidden; margin: 0 -5px; }
+.row > .f, .row > .chk { float: left; padding: 0 5px; }
+.w50 { width: 50%; } .w33 { width: 33.33%; } .w25 { width: 25%; } .w75 { width: 75%; } .w100 { width: 100%; }
+@media (max-width: 520px) { .w50, .w33, .w25, .w75 { width: 100%; } }
+.sub { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: #8891a0; border-top: 1px solid #242a33; padding-top: 10px; margin: 6px 0 10px; clear: both; }
+.bellrow { overflow: hidden; margin: 0 -4px; }
+.bellrow .f { float: left; padding: 0 4px; margin-bottom: 8px; }
+.bellrow .b1 { width: 18%; } .bellrow .b2 { width: 44%; } .bellrow .b3 { width: 24%; } .bellrow .b4 { width: 14%; padding-top: 18px; }
+
+.kv { font-size: 12px; line-height: 1.9; }
+.kv b { display: inline-block; width: 150px; color: #8891a0; font-weight: 400; vertical-align: top; }
+.kv span { display: inline-block; max-width: 70%; word-break: break-all; }
+.ok { color: #3ddc97; } .bad { color: #ff5d5d; } .dim { color: #8891a0; }
+a { color: #ff9142; }
+
+.preview { position: relative; background: #000; border: 1px solid #242a33; border-radius: 8px; overflow: hidden; height: 0; padding-bottom: 56.25%; margin-bottom: 8px; }
+.preview img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
+.preview .pv-txt { position: absolute; top: 0; left: 0; right: 0; bottom: 0; padding: 16px; font-size: 11px; color: #8891a0; text-align: center;
+  display: -webkit-box; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; }
+.camstate { font-size: 11px; margin-bottom: 10px; line-height: 1.5; }
+pre.logbox { display: none; white-space: pre-wrap; word-break: break-all; font-size: 10px; color: #8891a0; background: #0a0c0f; border: 1px solid #242a33; border-radius: 6px; padding: 8px; max-height: 160px; overflow: auto; margin-bottom: 10px; }
+
+button.btn { background: #171b21; color: #e5e8ec; border: 1px solid #242a33; border-radius: 8px; padding: 9px 14px; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.3px; text-transform: uppercase; cursor: pointer; -webkit-appearance: none; }
+button.btn:hover { border-color: #ff9142; }
+button.pri { border-color: #ff9142; color: #ff9142; }
+button.mini { padding: 8px 0; width: 100%; font-size: 10px; }
+.actions { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; padding: 12px 20px; background: rgba(10,12,15,0.95); border-top: 1px solid #242a33; text-align: right; }
+.actions .msg { float: left; font-size: 12px; color: #8891a0; padding-top: 9px; max-width: 60%; }
+.actions .msg.ok { color: #3ddc97; } .actions .msg.err { color: #ff5d5d; }
+.actions button { margin-left: 8px; }
+#overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 50; background: rgba(10,12,15,0.95); display: none; text-align: center; padding-top: 30vh; }
+#overlay .t { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+#overlay .s { font-size: 12px; color: #8891a0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Klingel<span>Einrichtung</span></h1>
+  <div class="hdr mono"><span class="dot" id="dotMqtt"></span><span>MQTT</span><span class="dot" id="dotCam1"></span><span>CAM1</span><span class="dot" id="dotCam2"></span><span>CAM2</span><span>v{{VERSION}}</span></div>
+</header>
+
+<main>
+  <div class="card">
+    <div class="card-head"><span class="card-title">Gerätestatus · Brume 2</span><span class="card-title mono" id="uptime"></span></div>
+    <div class="card-body kv mono" id="status">lade …</div>
+  </div>
+  <div class="grid">
+    <div class="col" id="colA"></div>
+    <div class="col" id="colB"></div>
+  </div>
+</main>
+
+<div class="actions">
+  <span class="msg mono" id="msg"></span>
+  <button class="btn" type="button" id="btnRestart">Neustart</button>
+  <button class="btn pri" type="button" id="btnSave">Speichern &amp; Neustart</button>
+</div>
+<div id="overlay"><div class="t" id="ovT">Neustart …</div><div class="s mono" id="ovS"></div></div>
+
+<script>
+/* ES5 – funktioniert auch auf älteren iPads */
+var SCHEMA = null, SETTINGS = null, NUM_SITES = 2, NUM_BELLS = 3;
+function $(id) { return document.getElementById(id); }
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function req(method, url, body, cb, err, timeoutMs) {
+  var x = new XMLHttpRequest();
+  x.open(method, url, true);
+  x.timeout = timeoutMs || 8000;
+  if (body !== null) x.setRequestHeader('Content-Type', 'application/json');
+  x.onreadystatechange = function () {
+    if (x.readyState !== 4) return;
+    var d = null; try { d = JSON.parse(x.responseText); } catch (e) {}
+    if (x.status >= 200 && x.status < 300) { if (cb) cb(d); }
+    else if (err) err((d && d.error) || ('HTTP ' + x.status));
+  };
+  x.ontimeout = function () { if (err) err('Zeitüberschreitung'); };
+  x.send(body === null ? null : JSON.stringify(body));
+}
+function setMsg(t, cls) { var m = $('msg'); m.innerHTML = esc(t); m.className = 'msg mono ' + (cls || ''); }
+function fieldsOf(sec) { var o = []; for (var i = 0; i < SCHEMA.fields.length; i++) if (SCHEMA.fields[i].sec === sec) o.push(SCHEMA.fields[i]); return o; }
+function F(sec, key) { var l = fieldsOf(sec); for (var i = 0; i < l.length; i++) if (l[i].key === key) return l[i]; return null; }
+
+function input(f, cls, noLabel) {
+  var id = f.sec + '.' + f.key, h = '';
+  if (f.type === 'bool') {
+    return '<label class="chk ' + (cls || '') + '"><input type="checkbox" data-k="' + id + '">' + esc(f.label) +
+      (f.hint ? '<small>' + esc(f.hint) + '</small>' : '') + '</label>';
+  }
+  h += '<label class="f ' + (cls || '') + '">' + (noLabel ? '<span>' + esc(noLabel) + '</span>' : '<span>' + esc(f.label) + '</span>');
+  if (f.type === 'choice') {
+    h += '<select data-k="' + id + '">';
+    for (var i = 0; i < f.options.length; i++) h += '<option value="' + f.options[i] + '">' + f.options[i] + '</option>';
+    h += '</select>';
+  } else {
+    var t = f.type === 'pass' ? 'password' : ((f.type === 'int' || f.type === 'port') ? 'number' : 'text');
+    h += '<input type="' + t + '" data-k="' + id + '" autocomplete="off"' +
+      (f.min !== undefined ? ' min="' + f.min + '"' : '') + (f.max !== undefined ? ' max="' + f.max + '"' : '') + '>';
+  }
+  if (f.hint && !noLabel) h += '<small>' + esc(f.hint) + '</small>';
+  if (f.type === 'pass') h += '<label class="chk" style="margin:6px 0 0"><input type="checkbox" data-clear="' + id + '">gespeichertes Passwort löschen</label>';
+  return h + '</label>';
+}
+function card(title, body, extra) {
+  return '<div class="card"><div class="card-head"><span class="card-title">' + esc(title) + '</span>' + (extra || '') +
+    '</div><div class="card-body">' + body + '</div></div>';
+}
+function simpleSection(sec, title, layout) {
+  var l = fieldsOf(sec), h = '<div class="row">';
+  for (var i = 0; i < l.length; i++) h += input(l[i], (layout && layout[l[i].key]) || 'w100');
+  return card(title, h + '</div>');
+}
+function siteCard(n) {
+  var s = 'dashboard' + n, h = '<div class="row">';
+  h += input(F(s, 'port'), 'w25') + input(F(s, 'titel'), 'w75') + '</div>';
+  h += '<div class="sub">Kamera</div>';
+  h += '<div class="preview"><img id="pv' + n + '" alt=""><div class="pv-txt mono" id="pvt' + n + '">Vorschau …</div></div>';
+  h += '<div class="camstate mono" id="cs' + n + '"></div>';
+  h += '<div class="row">' + input(F(s, 'kamera_typ'), 'w33') + input(F(s, 'rtsp_transport'), 'w33') + input(F(s, 'bildmodus'), 'w33') + '</div>';
+  h += '<div class="row">' + input(F(s, 'kamera_url'), 'w100') + '</div>';
+  h += '<div class="row">' + input(F(s, 'kamera_benutzer'), 'w50') + input(F(s, 'kamera_passwort'), 'w50') + '</div>';
+  h += '<div class="row">' + input(F(s, 'bilder_pro_sekunde'), 'w33') + input(F(s, 'max_breite'), 'w33') + input(F(s, 'jpeg_qualitaet'), 'w33') + '</div>';
+  h += '<div class="row">' + input(F(s, 'sparmodus'), 'w50') + input(F(s, 'immer_aktiv'), 'w50') + '</div>';
+  h += '<button class="btn" type="button" onclick="testCam(' + n + ')">Kamera mit diesen Werten testen</button> <span class="mono dim" id="tcs' + n + '" style="font-size:11px"></span>';
+  h += '<pre class="logbox mono" id="tlog' + n + '"></pre>';
+  h += '<div class="sub">Klingeln · leeres Topic = ausgeblendet · leere Payload = jede Nachricht</div>';
+  for (var b = 1; b <= NUM_BELLS; b++) {
+    h += '<div class="bellrow">' + input(F(s, 'klingel' + b + '_name'), 'b1', 'Name') + input(F(s, 'klingel' + b + '_topic'), 'b2', 'Topic ' + b) +
+      input(F(s, 'klingel' + b + '_payload'), 'b3', 'Payload') +
+      '<div class="f b4"><button class="btn mini" type="button" onclick="testBell(' + n + ',' + b + ')">Test</button></div></div>';
+  }
+  return card('Dashboard ' + n, h, '<a id="lnk' + n + '" target="_blank" href="#">öffnen ↗</a>');
+}
+
+function build() {
+  var a = '', b = '';
+  a += simpleSection('mqtt', 'MQTT-Broker', { broker: 'w75', port: 'w25', benutzer: 'w50', passwort: 'w50', client_id: 'w100' });
+  a += simpleSection('oeffner', 'Türöffner – beide Dashboards senden diesen Befehl', { topic_druecken: 'w50', payload_druecken: 'w50', topic_loslassen: 'w50', payload_loslassen: 'w50' });
+  a += simpleSection('allgemein', 'Allgemein', { einrichtung_port: 'w50', admin_passwort: 'w50' });
+  a += siteCard(1);
+  b += siteCard(2);
+  for (var n = 3; n <= NUM_SITES; n++) b += siteCard(n);
+  $('colA').innerHTML = a;
+  $('colB').innerHTML = b;
+}
+function fill(d) {
+  SETTINGS = d;
+  var els = document.querySelectorAll('[data-k]');
+  for (var i = 0; i < els.length; i++) {
+    var el = els[i], k = el.getAttribute('data-k'), v = d[k];
+    if (el.type === 'checkbox') el.checked = !!v;
+    else el.value = (v === null || v === undefined) ? '' : v;
+    if (el.type === 'password') el.placeholder = d[k + '__set'] ? '•••••• gespeichert – leer = unverändert' : 'kein Passwort';
+  }
+  var cl = document.querySelectorAll('[data-clear]');
+  for (var j = 0; j < cl.length; j++) cl[j].parentNode.style.display = d[cl[j].getAttribute('data-clear') + '__set'] ? 'block' : 'none';
+}
+function collect() {
+  var o = {}, els = document.querySelectorAll('[data-k]');
+  for (var i = 0; i < els.length; i++) {
+    var el = els[i];
+    o[el.getAttribute('data-k')] = el.type === 'checkbox' ? el.checked : el.value;
+  }
+  var cl = document.querySelectorAll('[data-clear]');
+  for (var j = 0; j < cl.length; j++) if (cl[j].checked) o[cl[j].getAttribute('data-clear') + '__clear'] = true;
+  return o;
+}
+
+/* ── Status ── */
+var STATE_TXT = { laeuft: 'läuft', verbinde: 'verbinde', fehler: 'FEHLER', ruht: 'ruht (kein Zuschauer)', aus: 'aus' };
+function fmtUp(s) { var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return 'Laufzeit ' + (d ? d + 'd ' : '') + h + 'h ' + m + 'm'; }
+function loadStatus() {
+  req('GET', '/api/status?t=' + new Date().getTime(), null, function (st) {
+    $('uptime').innerHTML = fmtUp(st.uptime_s);
+    $('dotMqtt').className = 'dot' + (st.mqtt ? ' on' : '');
+    var host = location.hostname, ips = [];
+    for (var i = 0; i < st.ips.length; i++) ips.push(esc(st.ips[i].ip) + ' <span class="dim">(' + esc(st.ips[i].dev) + ')</span>');
+    var ff = st.ffmpeg || {};
+    var ffTxt = ff.path ? esc(ff.path) + ' · ' + esc(ff.version) + ' · H.264 ' + (ff.h264 ? '<span class="ok">ja</span>' : '<span class="bad">NEIN – install.sh erneut ausführen</span>') + ' · H.265 ' + (ff.hevc ? 'ja' : 'nein')
+                       : '<span class="bad">nicht gefunden – install.sh erneut ausführen</span>';
+    var links = [];
+    for (var n = 1; n <= NUM_SITES; n++) {
+      var u = 'http://' + host + ':' + st.ports[n - 1] + '/';
+      links.push('<a href="' + esc(u) + '" target="_blank">' + esc(u) + '</a> <span class="dim">' + esc(st.titles[String(n)] || '') + '</span>');
+      var a = $('lnk' + n); if (a) a.href = u;
+    }
+    $('status').innerHTML =
+      '<b>Version</b><span>' + esc(st.name) + ' v' + esc(st.version) + ' · Python ' + esc(st.python) + '</span><br>' +
+      '<b>IP-Adressen</b><span>' + ips.join(', ') + '</span><br>' +
+      '<b>Dashboards</b><span>' + links.join('<br>') + '</span><br>' +
+      '<b>MQTT</b><span class="' + (st.mqtt ? 'ok' : 'bad') + '">' + esc(st.mqtt_state) + '</span><br>' +
+      '<b>ffmpeg</b><span>' + ffTxt + '</span><br>' +
+      '<b>Konfiguration</b><span>' + esc(st.config) + '</span>';
+    for (var c = 1; c <= NUM_SITES; c++) {
+      var cs = st.cams[String(c)];
+      if (!cs) continue;
+      $('dotCam' + c) && ($('dotCam' + c).className = 'dot' + (cs.state === 'laeuft' ? ' on' : ''));
+      var t = '<span class="' + (cs.state === 'laeuft' ? 'ok' : (cs.state === 'fehler' ? 'bad' : 'dim')) + '">' + (STATE_TXT[cs.state] || cs.state) + '</span>';
+      if (cs.state === 'laeuft') t += ' · ' + cs.w + '×' + cs.h + ' · ' + cs.fps + ' B/s';
+      if (cs.msg) t += ' · ' + esc(cs.msg);
+      var el = $('cs' + c); if (el) el.innerHTML = t;
+    }
+  }, function () { $('dotMqtt').className = 'dot'; });
+}
+
+/* ── Vorschau: Einzelbilder (schont die iPads und die Brume) ── */
+function previewLoop(n) {
+  var im = new Image(), done = false;
+  var to = setTimeout(function () { if (!done) { done = true; setTimeout(function () { previewLoop(n); }, 2000); } }, 12000);
+  im.onload = function () { if (done) return; done = true; clearTimeout(to); $('pv' + n).src = im.src; $('pvt' + n).style.display = 'none'; setTimeout(function () { previewLoop(n); }, 1000); };
+  im.onerror = function () { if (done) return; done = true; clearTimeout(to); $('pvt' + n).style.display = ''; $('pvt' + n).innerHTML = 'kein Bild'; setTimeout(function () { previewLoop(n); }, 3000); };
+  im.src = '/cam/' + n + '/snapshot.jpg?t=' + new Date().getTime();
+}
+
+function testCam(n) {
+  var vals = collect(), out = {};
+  for (var k in vals) if (vals.hasOwnProperty(k) && k.indexOf('dashboard' + n + '.') === 0) out[k] = vals[k];
+  $('tcs' + n).innerHTML = 'teste … (bis 20 s)';
+  $('tlog' + n).style.display = 'none';
+  req('POST', '/api/test_cam', { site: n, values: out }, function (d) {
+    if (d && d.ok) {
+      $('tcs' + n).innerHTML = '<span class="ok">OK – ' + d.w + '×' + d.h + '</span>';
+      $('pv' + n).src = 'data:image/jpeg;base64,' + d.image;
+      $('pvt' + n).style.display = 'none';
+    } else {
+      $('tcs' + n).innerHTML = '<span class="bad">' + esc((d && d.error) || 'Fehler') + '</span>';
+    }
+    if (d && d.log) { $('tlog' + n).style.display = 'block'; $('tlog' + n).innerHTML = esc(d.log); }
+  }, function (e) { $('tcs' + n).innerHTML = '<span class="bad">' + esc(e) + '</span>'; }, 30000);
+}
+function testBell(n, b) {
+  req('POST', '/api/test_bell', { site: n, bell: b }, function () { setMsg('Testklingeln an Dashboard ' + n + ' / Klingel ' + b, 'ok'); },
+    function (e) { setMsg('Fehler: ' + e, 'err'); });
+}
+function overlay(t, s) { $('ovT').innerHTML = esc(t); $('ovS').innerHTML = s || ''; $('overlay').style.display = 'block'; }
+function waitBack(url) {
+  var tries = 0;
+  function again() {
+    tries++;
+    var x = new XMLHttpRequest();
+    x.open('GET', url + 'api/status?t=' + new Date().getTime(), true);
+    x.timeout = 2000;
+    x.onreadystatechange = function () { if (x.readyState === 4) { if (x.status === 200 || x.status === 401) location.href = url; else if (tries < 40) setTimeout(again, 1500); } };
+    x.ontimeout = function () { if (tries < 40) setTimeout(again, 1500); };
+    try { x.send(null); } catch (e) { if (tries < 40) setTimeout(again, 1500); }
+  }
+  setTimeout(again, 2500);
+}
+$('btnSave').onclick = function () {
+  var vals = collect();
+  setMsg('speichere …');
+  req('POST', '/api/settings', vals, function () {
+    var port = parseInt(vals['allgemein.einrichtung_port'], 10) || 8083;
+    var url = location.protocol + '//' + location.hostname + ':' + port + '/';
+    overlay('Gespeichert – Dienst startet neu …', 'Einrichtung danach unter <a href="' + esc(url) + '">' + esc(url) + '</a>');
+    waitBack(url);
+  }, function (e) { setMsg('Nicht gespeichert: ' + e, 'err'); });
+};
+$('btnRestart').onclick = function () {
+  if (!confirm('Klingel-Dienst jetzt neu starten?')) return;
+  req('POST', '/api/restart', {}, function () { overlay('Neustart …', ''); waitBack(location.protocol + '//' + location.host + '/'); },
+    function (e) { setMsg('Fehler: ' + e, 'err'); });
+};
+
+req('GET', '/api/schema', null, function (s) {
+  SCHEMA = s; NUM_SITES = s.num_sites; NUM_BELLS = s.num_bells;
+  build();
+  req('GET', '/api/settings', null, function (d) {
+    fill(d);
+    loadStatus(); setInterval(loadStatus, 3000);
+    for (var n = 1; n <= NUM_SITES; n++) previewLoop(n);
+  }, function (e) { setMsg('Einstellungen nicht ladbar: ' + e, 'err'); });
+}, function (e) { setMsg('Brume nicht erreichbar: ' + e, 'err'); });
+</script>
+</body>
+</html>

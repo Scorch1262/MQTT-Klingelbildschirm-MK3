@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Klingel – {{TITLE}}</title>
+<style>
+/* Design wie v2.2.0 / v3.x – absichtlich ohne CSS-Variablen, gap und inset (iOS 9) */
+* { -webkit-box-sizing: border-box; box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: #0a0c0f; color: #e5e8ec;
+  font-family: 'Inter', 'Segoe UI', -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  -webkit-tap-highlight-color: rgba(0,0,0,0);
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+  -webkit-text-size-adjust: 100%;
+}
+.mono { font-family: 'JetBrains Mono', Menlo, Consolas, 'Courier New', monospace; }
+
+/* ── Kopfzeile ── */
+header {
+  position: absolute; top: 0; left: 0; right: 0; height: 52px;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-align-items: center; align-items: center;
+  -webkit-justify-content: space-between; justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1px solid #242a33;
+  background: #0d1014;
+  background: -webkit-linear-gradient(top, #0d1014, #0a0c0f);
+  background: linear-gradient(180deg, #0d1014, #0a0c0f);
+}
+header h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap; }
+header h1 span.acc { color: #ff9142; }
+.badge {
+  font-size: 11px; color: #8891a0; font-weight: 400; margin-left: 10px; padding: 2px 8px;
+  border: 1px solid #242a33; border-radius: 20px; text-transform: none; letter-spacing: 0.05em;
+}
+.hdr-right { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
+.hdr-right > * { margin-left: 8px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #ff5d5d; display: inline-block; }
+.dot.on { background: #3ddc97; box-shadow: 0 0 6px #3ddc97; }
+.lbl { font-size: 10px; color: #8891a0; letter-spacing: 0.05em; margin-right: 6px; }
+.clock { font-size: 12px; color: #8891a0; margin-left: 12px; }
+
+/* ── Layout ── */
+.layout { position: absolute; top: 52px; left: 0; right: 0; bottom: 0; }
+.video-panel {
+  position: absolute; top: 0; left: 0; bottom: 0; width: 76%;
+  padding: 12px 14px; border-right: 1px solid #242a33;
+}
+.panel-label {
+  position: absolute; top: 12px; left: 16px; right: 16px; height: 16px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: #8891a0;
+}
+.video-card {
+  position: absolute; top: 34px; left: 14px; right: 14px; bottom: 12px;
+  background: #000; border: 1px solid #242a33; border-radius: 10px; overflow: hidden;
+}
+.video-card img {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  object-fit: contain; display: none; background: #000;
+}
+.offline {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-flex-direction: column; flex-direction: column;
+  -webkit-align-items: center; align-items: center;
+  -webkit-justify-content: center; justify-content: center;
+  background: #0a0c0f; color: #8891a0; text-align: center; padding: 20px;
+}
+.offline svg { opacity: 0.3; margin-bottom: 12px; }
+.offline .t { font-size: 13px; letter-spacing: 0.1em; color: #c9ced6; }
+.offline .h { font-size: 11px; margin-top: 10px; max-width: 520px; line-height: 1.6; }
+.cam-badge {
+  position: absolute; bottom: 10px; left: 12px; font-size: 10px; color: #3ddc97;
+  letter-spacing: 0.1em; opacity: 0.8; text-shadow: 0 0 4px #000;
+}
+
+.control-panel {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 24%;
+  padding: 12px; background: #12151a; overflow: hidden;
+}
+.card { background: #12151a; border: 1px solid #242a33; border-radius: 10px; overflow: hidden; }
+.card-head {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-align-items: center; align-items: center;
+  -webkit-justify-content: space-between; justify-content: space-between;
+  padding: 9px 12px; border-bottom: 1px solid #242a33; background: #171b21;
+}
+.card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: #8891a0; }
+.card-body { padding: 12px; }
+
+#bellCard { position: absolute; top: 12px; left: 12px; right: 12px; }
+.bells { display: -webkit-box; display: -webkit-flex; display: flex; }
+.bell {
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; margin-left: 8px;
+  text-align: center; padding: 8px 2px 6px;
+  background: #171b21; border: 1px solid #242a33; border-radius: 8px;
+  -webkit-transition: all 0.25s; transition: all 0.25s;
+}
+.bell:first-child { margin-left: 0; }
+.bell svg { color: #8891a0; display: block; margin: 0 auto 4px; }
+.bell .n { font-size: 10px; color: #8891a0; letter-spacing: 0.05em; }
+.bell.active { border-color: #3ddc97; background: #132018; box-shadow: 0 0 12px rgba(61,220,151,0.25); }
+.bell.active svg, .bell.active .n { color: #3ddc97; }
+@-webkit-keyframes ring { 0%,100%{-webkit-transform:rotate(0)} 20%{-webkit-transform:rotate(-14deg)} 40%{-webkit-transform:rotate(14deg)} 60%{-webkit-transform:rotate(-8deg)} 80%{-webkit-transform:rotate(8deg)} }
+@keyframes ring { 0%,100%{transform:rotate(0)} 20%{transform:rotate(-14deg)} 40%{transform:rotate(14deg)} 60%{transform:rotate(-8deg)} 80%{transform:rotate(8deg)} }
+.bell.active svg { -webkit-animation: ring 0.55s ease-in-out 3; animation: ring 0.55s ease-in-out 3; }
+
+#openerCard { position: absolute; left: 12px; right: 12px; top: 124px; bottom: 150px; }
+#openerCard .card-body { position: absolute; top: 37px; left: 0; right: 0; bottom: 0; }
+.state { font-size: 10px; padding: 2px 8px; border-radius: 20px; border: 1px solid #242a33; color: #8891a0; text-transform: uppercase; }
+.state.on { color: #3ddc97; border-color: rgba(61,220,151,0.4); }
+.opener {
+  position: absolute; top: 12px; left: 12px; right: 12px; bottom: 12px;
+  border-radius: 14px; background: #171b21; border: 1px solid #242a33; color: #e5e8ec;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-flex-direction: column; flex-direction: column;
+  -webkit-align-items: center; align-items: center;
+  -webkit-justify-content: center; justify-content: center;
+  cursor: pointer; outline: none; -webkit-appearance: none;
+  -webkit-transition: all 0.15s; transition: all 0.15s;
+}
+.opener svg { color: #ff9142; margin-bottom: 12px; }
+.opener .l { font-size: 13px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; }
+.opener .s { font-size: 9px; color: #8891a0; margin-top: 6px; letter-spacing: 0.05em; }
+.opener.pressed { border-color: #3ddc97; background: #132018; box-shadow: 0 0 24px rgba(61,220,151,0.2);
+  -webkit-transform: scale(0.97); transform: scale(0.97); }
+.opener.pressed svg { color: #3ddc97; }
+.opener.warn { border-color: #ff5d5d; }
+
+#logCard { position: absolute; left: 12px; right: 12px; bottom: 12px; height: 126px; }
+.log { font-size: 10px; color: #8891a0; line-height: 1.65; overflow: hidden; height: 80px; }
+.log .hi { color: #3ddc97; }
+.log .er { color: #ff5d5d; }
+
+/* Hochformat (iPad hochkant): Video oben, Bedienung unten */
+@media (orientation: portrait) {
+  .video-panel { width: auto; right: 0; bottom: 46%; border-right: 0; border-bottom: 1px solid #242a33; }
+  .control-panel { width: auto; left: 0; top: 54%; }
+  #bellCard { right: 52%; }
+  #openerCard { top: 12px; left: 50%; bottom: 12px; }
+  #logCard { right: 52%; height: auto; top: 124px; }
+  .log { height: auto; position: absolute; top: 46px; bottom: 8px; left: 12px; right: 12px; }
+}
+@media (max-width: 700px) and (orientation: landscape) {
+  .badge, .lbl, .clock { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Klingel<span class="acc">Dashboard</span><span class="badge" id="siteBadge">{{TITLE}}</span></h1>
+  <div class="hdr-right mono">
+    <span class="dot" id="mqttDot"></span><span class="lbl">MQTT</span>
+    <span class="dot" id="camDot"></span><span class="lbl">CAM</span>
+    <span class="dot" id="audioDot"></span><span class="lbl">AUDIO</span>
+    <span class="clock" id="clock">--:--:--</span>
+    <span class="lbl">v{{VERSION}}</span>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="video-panel">
+    <div class="panel-label" id="panelLabel">{{TITLE}} — Live</div>
+    <div class="video-card">
+      <img id="camImg" alt="">
+      <div class="offline" id="offline">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+          <path d="M1 1l22 22M17 17H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3"/>
+          <path d="M9.5 4H17a2 2 0 0 1 2 2v9.5"/>
+          <path d="M14.752 10.027A4 4 0 0 1 12 18a4 4 0 0 1-4-4"/>
+        </svg>
+        <div class="t mono" id="offText">VERBINDE …</div>
+        <div class="h mono" id="offHint"></div>
+      </div>
+      <div class="cam-badge mono" id="camBadge" style="display:none">CH-01 • LIVE</div>
+    </div>
+  </div>
+
+  <div class="control-panel">
+    <div class="card" id="bellCard">
+      <div class="card-head"><span class="card-title">Klingel Monitor</span></div>
+      <div class="card-body"><div class="bells" id="bells"></div></div>
+    </div>
+
+    <div class="card" id="openerCard">
+      <div class="card-head">
+        <span class="card-title">Türöffner</span>
+        <span class="state mono" id="openerState">BEREIT</span>
+      </div>
+      <div class="card-body">
+        <div class="opener" id="opener">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+            <rect x="3" y="11" width="18" height="11" rx="2"/>
+            <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+          </svg>
+          <span class="l">Öffnen</span>
+          <span class="s mono">DRÜCKEN &amp; HALTEN</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="logCard">
+      <div class="card-head"><span class="card-title">Ereignis Log</span></div>
+      <div class="card-body"><div class="log mono" id="log"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Nur ES5 – läuft auch auf iPad mini 1 (iOS 9) */
+var CFG = {{CONFIG_JSON}};
+
+function $(id) { return document.getElementById(id); }
+function pad(n) { return (n < 10 ? '0' : '') + n; }
+function hms(d) { return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); }
+function now() { return new Date().getTime(); }
+function hasClass(el, c) { return (' ' + el.className + ' ').indexOf(' ' + c + ' ') >= 0; }
+function addClass(el, c) { if (!hasClass(el, c)) el.className = (el.className + ' ' + c).replace(/^\s+/, ''); }
+function delClass(el, c) { el.className = (' ' + el.className + ' ').replace(' ' + c + ' ', ' ').replace(/^\s+|\s+$/g, ''); }
+function setClass(el, c, on) { if (on) addClass(el, c); else delClass(el, c); }
+
+/* ── Log ── */
+var logLines = [];
+function addLog(msg, cls) {
+  logLines.unshift({ t: '[' + hms(new Date()) + '] ' + msg, c: cls || '' });
+  if (logLines.length > 6) logLines.pop();
+  var el = $('log');
+  while (el.firstChild) el.removeChild(el.firstChild);
+  for (var i = 0; i < logLines.length; i++) {
+    var d = document.createElement('div');
+    d.className = logLines[i].c;
+    d.appendChild(document.createTextNode(logLines[i].t));
+    el.appendChild(d);
+  }
+}
+
+/* ── HTTP (XMLHttpRequest, kein fetch auf iOS 9) ── */
+function xhr(method, url, cb, err, timeoutMs) {
+  var x = new XMLHttpRequest();
+  var done = false;
+  x.open(method, url, true);
+  x.timeout = timeoutMs || 5000;
+  x.onreadystatechange = function () {
+    if (x.readyState !== 4 || done) return;
+    done = true;
+    if (x.status >= 200 && x.status < 300) {
+      var d = null;
+      try { d = JSON.parse(x.responseText); } catch (e) {}
+      if (cb) cb(d);
+    } else if (err) err(x.status);
+  };
+  x.ontimeout = function () { if (!done) { done = true; if (err) err(0); } };
+  try { x.send(null); } catch (e) { if (!done) { done = true; if (err) err(0); } }
+}
+
+/* ═════════════ AUDIO ═════════════
+   Startet automatisch. Blockiert der Browser, wird der Ton bei der ersten
+   beliebigen Berührung unsichtbar freigegeben (kein Overlay). */
+var AC = window.AudioContext || window.webkitAudioContext;
+var actx = null, audioLogged = '';
+function audioOk() { return !!actx && actx.state === 'running'; }
+function audioDot() {
+  setClass($('audioDot'), 'on', audioOk());
+  var st = actx ? actx.state : 'none';
+  if (st !== audioLogged) {
+    audioLogged = st;
+    if (st === 'running') addLog('SYS: Audio aktiv');
+    else if (st === 'suspended') addLog('SYS: Audio wartet auf Berührung');
+  }
+}
+function ensureAudio() {
+  if (!AC) return false;
+  if (!actx) {
+    try { actx = new AC(); } catch (e) { return false; }
+    actx.onstatechange = audioDot;
+  }
+  if (actx.state !== 'running' && actx.resume) {
+    try { var p = actx.resume(); if (p && p.then) p.then(audioDot, audioDot); } catch (e) {}
+  }
+  return true;
+}
+function silentBlip() {
+  if (!actx) return;
+  try {
+    var b = actx.createBuffer(1, 1, 22050), s = actx.createBufferSource();
+    s.buffer = b; s.connect(actx.destination);
+    if (s.start) s.start(0); else s.noteOn(0);
+  } catch (e) {}
+}
+function unlockAudio() { if (ensureAudio()) { silentBlip(); audioDot(); } }
+var unlockEvents = ['touchstart', 'touchend', 'mousedown', 'click', 'keydown'];
+for (var ue = 0; ue < unlockEvents.length; ue++) document.addEventListener(unlockEvents[ue], unlockAudio, true);
+setInterval(function () { if (!audioOk()) { ensureAudio(); audioDot(); } }, 2000);
+setInterval(function () {                      /* Keep-alive gegen Suspend */
+  if (!audioOk()) return;
+  try {
+    var sr = actx.sampleRate, b = actx.createBuffer(1, Math.floor(sr * 0.05), sr), d = b.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * 0.00001;
+    var s = actx.createBufferSource(), g = actx.createGain();
+    g.gain.value = 0.0001; s.buffer = b; s.connect(g); g.connect(actx.destination);
+    if (s.start) s.start(0); else s.noteOn(0);
+  } catch (e) {}
+}, 4000);
+
+function playDoorbell() {
+  if (!ensureAudio() || !actx) return;
+  if (!audioOk()) addLog('SYS: Ton blockiert – einmal tippen', 'er');
+  var t = actx.currentTime;
+  function tone(freq, start, vol) {
+    var o1 = actx.createOscillator(), o2 = actx.createOscillator();
+    var g = actx.createGain(), g2 = actx.createGain();
+    o1.type = 'sine'; o2.type = 'sine';
+    o1.frequency.value = freq; o2.frequency.value = freq * 2.76; g2.gain.value = 0.18;
+    g.gain.setValueAtTime(0, t + start);
+    g.gain.linearRampToValueAtTime(vol, t + start + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + start + 1.8);
+    o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(actx.destination);
+    if (o1.start) { o1.start(t + start); o2.start(t + start); o1.stop(t + start + 2); o2.stop(t + start + 2); }
+    else { o1.noteOn(t + start); o2.noteOn(t + start); o1.noteOff(t + start + 2); o2.noteOff(t + start + 2); }
+  }
+  tone(1047, 0.00, 0.8); tone(784, 0.45, 0.75); tone(1047, 2.2, 0.7); tone(784, 2.65, 0.7);
+}
+
+/* ═════════════ TÜRÖFFNER ═════════════ */
+var opener = $('opener'), pressed = false, repTimer = null;
+function onPress(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  unlockAudio();
+  if (pressed) return;
+  pressed = true;
+  addClass(opener, 'pressed');
+  $('openerState').innerHTML = 'AKTIV'; addClass($('openerState'), 'on');
+  addLog('ACT: Öffner GEDRÜCKT');
+  sendOpener('press');
+  repTimer = setInterval(function () { if (pressed) sendOpener('press'); }, CFG.repeat_ms || 500);
+}
+function onRelease(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  if (!pressed) return;
+  pressed = false;
+  if (repTimer) { clearInterval(repTimer); repTimer = null; }
+  delClass(opener, 'pressed');
+  $('openerState').innerHTML = 'BEREIT'; delClass($('openerState'), 'on');
+  addLog('ACT: Öffner LOSGELASSEN');
+  sendOpener('release');
+}
+function sendOpener(what) {
+  xhr('POST', '/api/' + what + '?t=' + now(), function (d) {
+    if (d && !d.ok) { addLog('MQTT: Befehl nicht gesendet', 'er'); addClass(opener, 'warn'); setTimeout(function () { delClass(opener, 'warn'); }, 800); }
+  }, function () { addLog('SYS: Brume nicht erreichbar', 'er'); }, 3000);
+}
+opener.addEventListener('touchstart', onPress, false);
+opener.addEventListener('touchend', onRelease, false);
+opener.addEventListener('touchcancel', onRelease, false);
+opener.addEventListener('mousedown', onPress, false);
+opener.addEventListener('mouseup', onRelease, false);
+opener.addEventListener('mouseleave', onRelease, false);
+window.addEventListener('blur', onRelease, false);
+
+/* ═════════════ KLINGELN ═════════════ */
+var BELL_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">' +
+  '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+var bellNames = {}, lastCount = null;
+(function buildBells() {
+  var row = $('bells');
+  if (!CFG.bells || !CFG.bells.length) { $('bellCard').style.display = 'none'; $('openerCard').style.top = '12px'; return; }
+  for (var i = 0; i < CFG.bells.length; i++) {
+    var b = CFG.bells[i];
+    bellNames[b.id] = b.name;
+    var d = document.createElement('div');
+    d.className = 'bell'; d.id = 'bell' + b.id;
+    d.innerHTML = BELL_SVG;
+    var n = document.createElement('div');
+    n.className = 'n mono'; n.appendChild(document.createTextNode(b.name));
+    d.appendChild(n);
+    row.appendChild(d);
+  }
+})();
+function ringBell(id) {
+  var el = $('bell' + id);
+  if (el) { delClass(el, 'active'); void el.offsetWidth; addClass(el, 'active'); }
+  playDoorbell();
+  addLog('BELL: ' + String(bellNames[id] || ('B' + id)).toUpperCase() + ' KLINGELT', 'hi');
+  if (camMode === 'einzelbild') loadSnapshot();
+}
+
+/* ═════════════ KAMERA ═════════════
+   auto: MJPEG-Video; liefert es dem Browser keine Bilder, Wechsel auf Einzelbilder. */
+var img = $('camImg');
+var cid = 'c' + Math.floor(Math.random() * 1e9).toString(36) + now().toString(36);
+var camMode = CFG.bildmodus === 'einzelbild' ? 'einzelbild' : 'mjpeg';
+var mjpegStarted = 0, lastClientFrames = 0, lastFrameAt = 0, mjpegRetries = 0, snapBusy = false, snapTimer = null;
+var camVisible = false, camLoggedState = '';
+
+function showFrame(on) {
+  img.style.display = on ? 'block' : 'none';
+  $('offline').style.display = on ? 'none' : '';
+  $('camBadge').style.display = on ? '' : 'none';
+  setClass($('camDot'), 'on', on);
+  if (on !== camVisible) { camVisible = on; addLog(on ? 'CAM: Bild da' : 'CAM: kein Bild', on ? '' : 'er'); }
+}
+function offlineText(t, h) { $('offText').innerHTML = ''; $('offText').appendChild(document.createTextNode(t)); $('offHint').innerHTML = ''; $('offHint').appendChild(document.createTextNode(h || '')); }
+
+function startMjpeg() {
+  camMode = 'mjpeg';
+  mjpegStarted = now();
+  img.onload = function () { lastFrameAt = now(); };
+  img.onerror = null;
+  img.src = '/stream.mjpg?cid=' + cid + '&t=' + now();
+}
+function stopStream() { img.onload = null; img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACw='; }
+function switchToSnapshots(reason) {
+  if (camMode === 'einzelbild') return;
+  addLog('CAM: ' + reason + ' – Einzelbildmodus');
+  stopStream();
+  camMode = 'einzelbild';
+  loadSnapshot();
+}
+function loadSnapshot() {
+  if (snapBusy || document.hidden) return;
+  snapBusy = true;
+  if (snapTimer) { clearTimeout(snapTimer); snapTimer = null; }
+  var im = new Image();
+  var finished = false;
+  var to = setTimeout(function () { if (!finished) { finished = true; snapBusy = false; next(2000); } }, 10000);
+  function next(ms) { if (camMode === 'einzelbild') snapTimer = setTimeout(loadSnapshot, ms); }
+  im.onload = function () {
+    if (finished) return; finished = true; clearTimeout(to);
+    img.src = im.src; lastFrameAt = now(); snapBusy = false;
+    next(Math.max(150, 1000 / (CFG.fps || 2)));
+  };
+  im.onerror = function () {
+    if (finished) return; finished = true; clearTimeout(to); snapBusy = false; next(2500);
+  };
+  im.src = '/snapshot.jpg?cid=' + cid + '&t=' + now();
+}
+
+function camUpdate(c) {
+  if (!CFG.cam) { showFrame(false); offlineText('KEINE KAMERA EINGERICHTET', 'Kamera-URL auf der Einrichtungsseite eintragen.'); return; }
+  var t = now();
+  if (camMode === 'mjpeg') {
+    if (c.client_frames > lastClientFrames) { lastClientFrames = c.client_frames; lastFrameAt = t; mjpegRetries = 0; }
+    if (c.state === 'laeuft' && t - mjpegStarted > 8000 && t - lastFrameAt > 6000) {
+      mjpegRetries++;
+      if (CFG.bildmodus === 'auto' && (lastClientFrames === 0 || mjpegRetries >= 3)) switchToSnapshots('Video kommt nicht an');
+      else { addLog('CAM: Video neu verbinden'); startMjpeg(); }
+    }
+  }
+  var fresh = lastFrameAt && (t - lastFrameAt < 6000);
+  showFrame(!!fresh);
+  if (!fresh) {
+    if (c.state === 'fehler') offlineText('KAMERA-FEHLER', c.msg || '');
+    else if (c.state === 'aus') offlineText('KEINE KAMERA EINGERICHTET', c.msg || '');
+    else if (c.state === 'laeuft') offlineText('LADE BILD …', '');
+    else offlineText('VERBINDE MIT KAMERA …', c.msg || '');
+  }
+  if (c.state + c.msg !== camLoggedState) {
+    camLoggedState = c.state + c.msg;
+    if (c.state === 'fehler') addLog('CAM: ' + c.msg, 'er');
+  }
+}
+
+/* ═════════════ STATUS-ABFRAGE ═════════════ */
+var pollFails = 0, online = null;
+function poll() {
+  xhr('GET', '/api/poll?cid=' + cid + '&view=' + (document.hidden ? 0 : 1) + '&t=' + now(), function (d) {
+    if (!d) { setTimeout(poll, 1000); return; }
+    pollFails = 0;
+    if (online !== true) { online = true; addLog('SYS: Verbindung zur Brume OK'); }
+    setClass($('mqttDot'), 'on', !!d.mqtt);
+    var bells = d.bells || {};
+    if (lastCount === null) {
+      lastCount = {};
+      for (var k in bells) if (bells.hasOwnProperty(k)) lastCount[k] = bells[k].n;
+    } else {
+      for (var id in bells) {
+        if (!bells.hasOwnProperty(id)) continue;
+        var b = bells[id];
+        if (lastCount[id] !== undefined && b.n > lastCount[id]) ringBell(id);
+        else if (!b.a) { var el = $('bell' + id); if (el) delClass(el, 'active'); }
+        lastCount[id] = b.n;
+      }
+    }
+    if (d.cam) camUpdate(d.cam);
+    setTimeout(poll, 600);
+  }, function () {
+    pollFails++;
+    if (pollFails >= 3) {
+      delClass($('mqttDot'), 'on');
+      if (online !== false) { online = false; addLog('SYS: Brume nicht erreichbar', 'er'); }
+    }
+    setTimeout(poll, pollFails > 5 ? 3000 : 1000);
+  }, 4000);
+}
+
+/* Seite unsichtbar -> Stream anhalten (spart CPU auf der Brume), sichtbar -> weiter */
+document.addEventListener('visibilitychange', function () {
+  if (document.hidden) { if (camMode === 'mjpeg') stopStream(); }
+  else {
+    ensureAudio(); audioDot();
+    if (camMode === 'mjpeg' && CFG.cam) startMjpeg(); else loadSnapshot();
+  }
+}, false);
+window.addEventListener('pageshow', function () { ensureAudio(); audioDot(); }, false);
+
+/* ── Uhr ── */
+function tick() { $('clock').innerHTML = hms(new Date()); }
+setInterval(tick, 1000); tick();
+
+/* ── Start ── */
+unlockAudio();
+addLog('SYS: Dashboard geladen');
+if (CFG.cam) { if (camMode === 'mjpeg') startMjpeg(); else loadSnapshot(); }
+else { offlineText('KEINE KAMERA EINGERICHTET', 'Kamera-URL auf der Einrichtungsseite eintragen.'); }
+poll();
+</script>
+</body>
+</html>
