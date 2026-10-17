@@ -1,4 +1,4 @@
-# Klingel-Dashboard Brume 2 – v4.2.1
+# Klingel-Dashboard Brume 2 – v4.2.2
 
 Klingel-Dashboard für den **GL.iNet Brume 2 (GL-MT2500)**. Es läuft im Autostart der
 Brume und ersetzt den PC (v2.x) bzw. das RP2350-Board (v3.x):
@@ -42,15 +42,15 @@ Kommt im Browser trotzdem kein Video an, wechselt das Dashboard automatisch auf
 
 ## Installation
 
-1. Die Datei `klingel-dashboard-brume2_v4.2.1.sh` auf die Brume kopieren,
+1. Die Datei `klingel-dashboard-brume2_v4.2.2.sh` auf die Brume kopieren,
    z. B. mit WinSCP (Protokoll SCP, Benutzer `root`) nach `/root/` oder per
    ```
-   scp -O klingel-dashboard-brume2_v4.2.1.sh root@<IP-der-Brume>:/root/
+   scp -O klingel-dashboard-brume2_v4.2.2.sh root@<IP-der-Brume>:/root/
    ```
 2. Per SSH auf der Brume anmelden und starten:
    ```
    ssh root@<IP-der-Brume>
-   sh /root/klingel-dashboard-brume2_v4.2.1.sh
+   sh /root/klingel-dashboard-brume2_v4.2.2.sh
    ```
 3. Der Installer
    * installiert bei Bedarf **python3** (`opkg`),
@@ -164,8 +164,10 @@ Die Seiten sind für den Dauerbetrieb auf einem iPad im Querformat (1024×768) a
    dreimal die Home-Taste drücken – dann bleibt das iPad fest auf dem Dashboard.
 4. Nach dem Öffnen **einmal irgendwo auf die Seite tippen**. Safari lässt Ton erst nach
    einer Berührung zu (das lässt sich auf dem iPad nicht abschalten). Solange der Ton
-   gesperrt ist, ist der AUDIO-Punkt rot und unten im Bild blinkt
-   **„Klingelton gesperrt – bitte einmal auf den Bildschirm tippen“**. Danach bleibt der Ton frei,
+   gesperrt ist, ist der AUDIO-Punkt rot und unten im Bild blinkt der Knopf
+   **„Klingelton einschalten – hier tippen“**. Nach dem Tippen klingelt es einmal zur Probe.
+   Klappt die Freigabe nicht, steht der Grund im Ereignis-Log und in
+   `/root/Klingel-Dashboard/logs/klingel.log` (Zeilen mit `[IPAD1]`/`[IPAD2]`). Danach bleibt der Ton frei,
    solange die Seite offen ist; die Seite lädt sich dafür nie selbst neu.
 5. Lautstärke hoch, Lautlos-Schalter aus.
 
@@ -203,6 +205,12 @@ ist. Für Ton bei gesperrtem iPad: Lautlos-Schalter aus, Seite im Vordergrund la
 ---
 
 ## Versionsverlauf
+
+* **v4.2.2** – Ton-Freigabe auf dem iPad
+  * echter Knopf „Klingelton einschalten“ im Bild, klingelt zur Bestätigung einmal
+  * Web Audio wird erst beim Tippen angelegt (iOS-Vorgabe), bei Bedarf neu
+  * Freigabe nur über echte Gesten (touchend/click), touchstart zählt auf iOS nicht
+  * Audio-Fehler der iPads werden mit Grund in logs/klingel.log geschrieben
 
 * **v4.2.1** – Klingelton auf dem iPad
   * Klingelton zusätzlich als Datei `klingel.wav` vom Brume-Server (mit Byte-Range,

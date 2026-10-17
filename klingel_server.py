@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Klingel-Dashboard Brume 2  –  v4.2.1
+Klingel-Dashboard Brume 2  –  v4.2.2
 ====================================
 
 Laeuft auf einem GL.iNet Brume 2 (GL-MT2500, OpenWrt) im Autostart und stellt bereit:
@@ -37,7 +37,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
 APP_NAME = "Klingel-Dashboard Brume 2"
-APP_VERSION = "4.2.1"
+APP_VERSION = "4.2.2"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get("KLINGEL_CONFIG") or os.path.join(BASE_DIR, "config.ini")
@@ -1304,6 +1304,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def _site_post(self, n):
         p = self._route()
+        if p == "/api/log":
+            ln = min(int(self.headers.get("Content-Length") or 0), 2000)
+            txt = self.rfile.read(ln).decode("utf-8", "replace").replace("\n", " ") if ln > 0 else ""
+            log("IPAD%d" % n, "%s: %s" % (self.client_address[0], txt[:400]))
+            return self._json({"ok": True})
         if p in ("/api/press", "/mqtt/press"):
             ok = MQTT.publish(CFG["oeffner.topic_druecken"], CFG["oeffner.payload_druecken"])
             return self._json({"ok": ok, "mqtt": MQTT.connected})

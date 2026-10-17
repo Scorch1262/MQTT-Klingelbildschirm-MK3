@@ -46,7 +46,7 @@ header h1 span.acc { color: #ff9142; }
 .audio-hint { font-size: 10px; letter-spacing: 0.08em; color: #0a0c0f; background: #ff9142; border-radius: 20px; padding: 3px 10px; margin-right: 8px;
   -webkit-animation: blink 1.6s ease-in-out infinite; animation: blink 1.6s ease-in-out infinite; }
 @-webkit-keyframes blink { 50% { opacity: 0.45; } } @keyframes blink { 50% { opacity: 0.45; } }
-.audio-banner { position: absolute; left: 50%; bottom: 16px; width: 440px; margin-left: -220px; text-align: center;
+.audio-banner { position: absolute; left: 50%; bottom: 16px; width: 440px; margin-left: -220px; text-align: center; border: 0; cursor: pointer; -webkit-appearance: none; font-family: inherit;
   font-size: 15px; font-weight: 600; color: #0a0c0f; background: #ff9142; border-radius: 12px; padding: 12px 16px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.6); z-index: 5;
   -webkit-animation: blink 1.6s ease-in-out infinite; animation: blink 1.6s ease-in-out infinite; }
@@ -187,7 +187,7 @@ header h1 span.acc { color: #ff9142; }
         <div class="h mono" id="offHint"></div>
       </div>
       <div class="cam-badge mono" id="camBadge" style="display:none">CH-01 • LIVE</div>
-      <div class="audio-banner" id="audioBanner" style="display:none">&#128263; Klingelton gesperrt – bitte einmal auf den Bildschirm tippen</div>
+      <button type="button" class="audio-banner" id="audioBanner" style="display:none">&#128266; Klingelton einschalten – hier tippen</button>
     </div>
   </div>
 
@@ -290,47 +290,87 @@ function audioUi() {
     addLog('AUDIO: ' + (ok ? 'aktiv' : 'gesperrt') + ' (' + st + ')', ok ? '' : 'er');
   }
 }
+/* Diagnose: Meldungen ins Ereignis-Log UND ins Protokoll der Brume (logs/klingel.log) */
+function dlog(msg) {
+  addLog('AUDIO: ' + msg, 'er');
+  try {
+    var x = new XMLHttpRequest();
+    x.open('POST', '/api/log', true);
+    x.setRequestHeader('Content-Type', 'text/plain');
+    x.send('AUDIO ' + msg + ' | ' + navigator.userAgent);
+  } catch (e) {}
+}
 function makeBellEl() {
   if (bellEl) return;
   try {
     bellEl = document.createElement('audio');
-    bellEl.preload = 'auto';
     bellEl.setAttribute('playsinline', '');
     bellEl.setAttribute('webkit-playsinline', '');
+    bellEl.preload = 'auto';
     bellEl.src = '/klingel.wav';
+    bellEl.addEventListener('error', function () {
+      dlog('Datei-Fehler, Code ' + (bellEl.error ? bellEl.error.code : '?'));
+    }, false);
     document.body.appendChild(bellEl);
-  } catch (e) { bellEl = null; }
+  } catch (e) { bellEl = null; dlog('kein <audio> möglich: ' + e.name); }
 }
-function webStart() {
+/* Web Audio: im Berührungs-Handler anlegen/fortsetzen (so verlangt es Safari auf dem iPad) */
+function webUnlock() {
   if (!AC) return;
   try {
-    if (actx && actx.state === 'closed') actx = null;
-    if (!actx) { actx = new AC(); actx.onstatechange = audioUi; }
-    if (actx.state !== 'running' && actx.resume) { var p = actx.resume(); if (p && p.then) p.then(audioUi, audioUi); }
+    if (!actx || actx.state === 'closed') { actx = new AC(); actx.onstatechange = audioUi; }
     var b = actx.createBuffer(1, 1, 22050), s = actx.createBufferSource();
     s.buffer = b; s.connect(actx.destination);
     if (s.start) s.start(0); else s.noteOn(0);
-  } catch (e) {}
+    if (actx.state !== 'running' && actx.resume) {
+      var p = actx.resume();
+      if (p && p.then) p.then(audioUi, function (e) { dlog('WebAudio resume abgelehnt: ' + (e && e.name)); });
+    }
+    var c = actx;
+    setTimeout(function () {
+      if (c === actx && c.state !== 'running') {
+        dlog('WebAudio bleibt "' + c.state + '" – wird beim nächsten Tippen neu angelegt');
+        try { c.close(); } catch (e) {}
+        actx = null;
+      }
+      audioUi();
+    }, 800);
+  } catch (e) { dlog('WebAudio Fehler: ' + e.name + ' ' + e.message); }
 }
-/* Im Berührungs-Handler aufrufen: gibt das <audio>-Element frei.
-   klingel.wav beginnt mit 0,4 s Stille – das kurze Anspielen ist nicht zu hören. */
+/* <audio>-Element im Berührungs-Handler einmal abspielen -> danach darf es jederzeit spielen.
+   klingel.wav beginnt mit 0,4 s Stille, das Anspielen ist nicht zu hören. */
+var htmlBusySince = 0;
 function htmlUnlock() {
   makeBellEl();
-  if (!bellEl || htmlOk || htmlBusy) return;
-  htmlBusy = true;
+  if (!bellEl || htmlOk) return;
+  if (htmlBusy && now() - htmlBusySince < 3000) return;
+  htmlBusy = true; htmlBusySince = now();
   try {
     bellEl.muted = false;
-    bellEl.currentTime = 0;
     var p = bellEl.play();
-    var done = function () { try { bellEl.pause(); bellEl.currentTime = 0; } catch (e) {} htmlOk = true; htmlBusy = false; audioUi(); };
-    if (p && p.then) p.then(done, function () { htmlBusy = false; audioUi(); });
-    else setTimeout(done, 50);
-  } catch (e) { htmlBusy = false; }
+    var ok = function () { try { bellEl.pause(); bellEl.currentTime = 0; } catch (e) {} htmlOk = true; htmlBusy = false; audioUi(); };
+    if (p && p.then) p.then(ok, function (e) { htmlBusy = false; dlog('Datei-Ton abgelehnt: ' + (e && e.name) + ' ' + (e && e.message)); audioUi(); });
+    else setTimeout(ok, 80);
+  } catch (e) { htmlBusy = false; dlog('play() Fehler: ' + e.name); }
 }
-function unlockAudio() { htmlUnlock(); webStart(); audioUi(); }
-var unlockEvents = ['touchend', 'click', 'mouseup', 'keydown', 'touchstart', 'pointerup'];
+var lastUnlock = 0;
+function unlockAudio() {
+  if (audioOk()) return;
+  htmlUnlock(); webUnlock(); audioUi();
+}
+/* nur echte Gesten (touchstart zählt auf dem iPad nicht als Freigabe) */
+var unlockEvents = ['touchend', 'click', 'mouseup', 'keydown', 'pointerup'];
 for (var ue = 0; ue < unlockEvents.length; ue++) document.addEventListener(unlockEvents[ue], unlockAudio, true);
-setInterval(function () { if (actx && actx.state !== 'running' && actx.resume) { try { actx.resume(); } catch (e) {} } audioUi(); }, 1500);
+/* großer Knopf im Bild: freigeben und zur Bestätigung einmal klingeln */
+function bannerTap(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  lastUnlock = 0;
+  htmlUnlock(); webUnlock();
+  setTimeout(function () { audioUi(); if (audioOk()) { addLog('AUDIO: Testklingeln'); playDoorbell(); } }, 900);
+}
+$('audioBanner').addEventListener('touchend', bannerTap, false);
+$('audioBanner').addEventListener('click', bannerTap, false);
+setInterval(audioUi, 1500);
 setInterval(function () {                      /* Keep-alive gegen Suspend */
   if (!webOk()) return;
   try {
@@ -553,18 +593,18 @@ function poll() {
 document.addEventListener('visibilitychange', function () {
   if (document.hidden) { if (camMode === 'mjpeg') stopStream(); }
   else {
-    webStart(); audioUi();
+    audioUi();
     if (camMode === 'mjpeg' && CFG.cam) startMjpeg(); else loadSnapshot();
   }
 }, false);
-window.addEventListener('pageshow', function () { webStart(); audioUi(); }, false);
+window.addEventListener('pageshow', function () { audioUi(); }, false);
 
 /* ── Uhr ── */
 function tick() { $('clock').innerHTML = hms(new Date()); }
 setInterval(tick, 1000); tick();
 
 /* ── Start ── */
-makeBellEl(); webStart(); audioUi();
+makeBellEl(); audioUi();
 addLog('SYS: Dashboard geladen v' + CFG.version);
 if (CFG.cam) { if (camMode === 'mjpeg') startMjpeg(); else loadSnapshot(); }
 else { offlineText('KEINE KAMERA EINGERICHTET', 'Kamera-URL auf der Einrichtungsseite eintragen.'); }
