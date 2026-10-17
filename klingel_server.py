@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Klingel-Dashboard Brume 2  –  v4.2.3
+Klingel-Dashboard Brume 2  –  v4.2.4
 ====================================
 
 Laeuft auf einem GL.iNet Brume 2 (GL-MT2500, OpenWrt) im Autostart und stellt bereit:
@@ -37,7 +37,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
 APP_NAME = "Klingel-Dashboard Brume 2"
-APP_VERSION = "4.2.3"
+APP_VERSION = "4.2.4"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get("KLINGEL_CONFIG") or os.path.join(BASE_DIR, "config.ini")
@@ -1289,6 +1289,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._mjpeg(cam)
         if p == "/klingel.wav":
             return self._ranged(DOORBELL_WAV, "audio/wav")
+        if p in ("/klingel.m4a", "/klingel.mp3"):
+            ext = p[-3:]
+            if ext not in DOORBELL_ENC:
+                return self._send(404, "nicht vorhanden")
+            return self._ranged(DOORBELL_ENC[ext], "audio/mp4" if ext == "m4a" else "audio/mpeg")
         if p == "/snapshot.jpg":
             return self._snapshot(cam)
         if p == "/api/config":
@@ -1432,6 +1437,35 @@ def make_doorbell_wav():
 
 
 DOORBELL_WAV = None
+DOORBELL_ENC = {}      # "m4a"/"mp3" -> bytes (mit ffmpeg aus der WAV erzeugt)
+
+
+def encode_doorbell():
+    """AAC (m4a) und MP3 erzeugen – iPads im Blockierungsmodus spielen kein WAV."""
+    ff = FFMPEG.get("path")
+    if not ff or not DOORBELL_WAV:
+        log("TON", "ffmpeg fehlt - nur WAV-Klingelton verfügbar")
+        return
+    import tempfile
+    jobs = [("m4a", ["-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-f", "ipod"]),
+            ("mp3", ["-c:a", "libmp3lame", "-b:a", "128k", "-f", "mp3"])]
+    for ext, opts in jobs:
+        try:
+            fd, tmp = tempfile.mkstemp(suffix="." + ext)
+            os.close(fd)
+            r = subprocess.run([ff, "-hide_banner", "-loglevel", "error", "-y", "-f", "wav", "-i", "pipe:0"]
+                               + opts + [tmp], input=DOORBELL_WAV, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, timeout=60)
+            with open(tmp, "rb") as fh:
+                data = fh.read()
+            os.remove(tmp)
+            if r.returncode == 0 and len(data) > 1000:
+                DOORBELL_ENC[ext] = data
+            else:
+                log("TON", "%s nicht erzeugt: %s" % (ext, r.stderr.decode("utf-8", "replace").strip()[-200:]))
+        except Exception as e:  # noqa
+            log("TON", "%s nicht erzeugt: %s" % (ext, e))
+    log("TON", "Klingelton bereit: wav%s" % "".join(", " + k for k in DOORBELL_ENC))
 
 
 def _html_escape(s):
@@ -1552,6 +1586,7 @@ def main():
     log("SYS", "Konfiguration: %s" % CONFIG_PATH)
     find_ffmpeg()
     DOORBELL_WAV = make_doorbell_wav()
+    threading.Thread(target=encode_doorbell, daemon=True).start()
 
     CAMERA = Camera()
     CAMERA.start()

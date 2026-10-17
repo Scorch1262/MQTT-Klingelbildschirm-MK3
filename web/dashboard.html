@@ -308,28 +308,23 @@ function dlog(msg, info) {
   slog('AUDIO ' + msg + (sentInfo.ua ? '' : ' | ' + navigator.userAgent));
   sentInfo.ua = true;
 }
-/* Tondatei als Blob laden: Safari spielt Blob-Adressen ohne die strengen
-   HTTP-Range-Anforderungen seines Media-Players ab (Ursache "NotSupportedError"). */
-var bellBlobUrl = '', bellLoadTried = false;
-function loadBellBlob() {
-  if (bellLoadTried) return;
-  bellLoadTried = true;
-  try {
-    var x = new XMLHttpRequest();
-    x.open('GET', '/klingel.wav?v=' + CFG.version, true);
-    x.responseType = 'arraybuffer';
-    x.onload = function () {
-      if (x.status !== 200 || !x.response) { dlog('Tondatei nicht geladen (HTTP ' + x.status + ')'); return; }
-      try {
-        var blob = new Blob([x.response], { type: 'audio/wav' });
-        bellBlobUrl = (window.URL || window.webkitURL).createObjectURL(blob);
-        if (bellEl) { bellEl.src = bellBlobUrl; try { bellEl.load(); } catch (e) {} }
-      } catch (e) { dlog('Blob nicht möglich: ' + e.name); }
-    };
-    x.onerror = function () { dlog('Tondatei-Download fehlgeschlagen'); };
-    x.send(null);
-  } catch (e) { dlog('Tondatei-Download Fehler: ' + e.name); }
-}
+/* Tondatei: AAC (m4a) zuerst – das spielt jedes iPad, auch im Blockierungsmodus
+   (Lockdown Mode), der Web Audio und manche Formate (z. B. WAV) abschaltet.
+   Danach MP3, zuletzt WAV. Scheitert ein Format, wird automatisch das nächste genommen. */
+var bellSrcs = [], bellSrcIdx = 0;
+(function () {
+  var probe = document.createElement('audio'), c = probe.canPlayType ? function (t) { return probe.canPlayType(t); } : function () { return ''; };
+  var m4a = c('audio/mp4; codecs="mp4a.40.2"'), mp3 = c('audio/mpeg'), wav = c('audio/wav');
+  if (m4a) bellSrcs.push('/klingel.m4a');
+  if (mp3) bellSrcs.push('/klingel.mp3');
+  bellSrcs.push('/klingel.wav');
+  if (!bellSrcs.length) bellSrcs.push('/klingel.m4a');
+  setTimeout(function () {
+    dlog('Diagnose: WebAudio ' + (AC ? 'vorhanden' : 'FEHLT') + ', AAC "' + m4a + '", MP3 "' + mp3 + '", WAV "' + wav + '"' +
+      (AC ? '' : ' – vermutlich Blockierungsmodus (Lockdown Mode) aktiv'), true);
+  }, 1500);
+})();
+function bellSrc() { return bellSrcs[bellSrcIdx] + '?v=' + CFG.version; }
 function makeBellEl() {
   if (bellEl) return;
   try {
@@ -337,18 +332,21 @@ function makeBellEl() {
     bellEl.setAttribute('playsinline', '');
     bellEl.setAttribute('webkit-playsinline', '');
     bellEl.preload = 'auto';
-    if (bellBlobUrl) bellEl.src = bellBlobUrl;
+    bellEl.src = bellSrc();
     bellEl.addEventListener('error', function () {
-      if (bellEl.src.indexOf('blob:') === 0) {
-        dlog('Blob-Ton nicht abspielbar (Code ' + (bellEl.error ? bellEl.error.code : '?') + ') – nutze Datei-Adresse');
-        bellEl.src = '/klingel.wav?v=' + CFG.version;
+      var code = bellEl.error ? bellEl.error.code : '?';
+      if (bellSrcIdx + 1 < bellSrcs.length) {
+        dlog(bellSrcs[bellSrcIdx] + ' nicht abspielbar (Code ' + code + ') – nehme ' + bellSrcs[bellSrcIdx + 1]);
+        bellSrcIdx++;
+        htmlOk = false;
+        bellEl.src = bellSrc();
+        try { bellEl.load(); } catch (e) {}
       } else {
-        dlog('Datei-Fehler, Code ' + (bellEl.error ? bellEl.error.code : '?'));
+        dlog('keine Tondatei abspielbar (Code ' + code + ')');
       }
     }, false);
     document.body.appendChild(bellEl);
   } catch (e) { bellEl = null; dlog('kein <audio> möglich: ' + e.name); }
-  loadBellBlob();
 }
 /* Web Audio: im Berührungs-Handler anlegen/fortsetzen (so verlangt es Safari auf dem iPad) */
 function webUnlock() {
@@ -380,13 +378,12 @@ var htmlBusySince = 0;
 function htmlUnlock() {
   makeBellEl();
   if (!bellEl || htmlOk) return;
-  if (!bellEl.getAttribute('src')) bellEl.src = bellBlobUrl || ('/klingel.wav?v=' + CFG.version);
   if (htmlBusy && now() - htmlBusySince < 3000) return;
   htmlBusy = true; htmlBusySince = now();
   try {
     bellEl.muted = false;
     var p = bellEl.play();
-    var ok = function () { try { bellEl.pause(); bellEl.currentTime = 0; } catch (e) {} htmlOk = true; htmlBusy = false; dlog('Datei-Ton freigegeben', true); audioUi(); };
+    var ok = function () { try { bellEl.pause(); bellEl.currentTime = 0; } catch (e) {} htmlOk = true; htmlBusy = false; dlog('Datei-Ton freigegeben (' + bellSrcs[bellSrcIdx] + ')', true); audioUi(); };
     if (p && p.then) p.then(ok, function (e) { htmlBusy = false; dlog('Datei-Ton abgelehnt: ' + (e && e.name) + ' ' + (e && e.message)); audioUi(); });
     else setTimeout(ok, 80);
   } catch (e) { htmlBusy = false; dlog('play() Fehler: ' + e.name); }

@@ -1,4 +1,4 @@
-# Klingel-Dashboard Brume 2 – v4.2.3
+# Klingel-Dashboard Brume 2 – v4.2.4
 
 Klingel-Dashboard für den **GL.iNet Brume 2 (GL-MT2500)**. Es läuft im Autostart der
 Brume und ersetzt den PC (v2.x) bzw. das RP2350-Board (v3.x):
@@ -42,15 +42,15 @@ Kommt im Browser trotzdem kein Video an, wechselt das Dashboard automatisch auf
 
 ## Installation
 
-1. Die Datei `klingel-dashboard-brume2_v4.2.3.sh` auf die Brume kopieren,
+1. Die Datei `klingel-dashboard-brume2_v4.2.4.sh` auf die Brume kopieren,
    z. B. mit WinSCP (Protokoll SCP, Benutzer `root`) nach `/root/` oder per
    ```
-   scp -O klingel-dashboard-brume2_v4.2.3.sh root@<IP-der-Brume>:/root/
+   scp -O klingel-dashboard-brume2_v4.2.4.sh root@<IP-der-Brume>:/root/
    ```
 2. Per SSH auf der Brume anmelden und starten:
    ```
    ssh root@<IP-der-Brume>
-   sh /root/klingel-dashboard-brume2_v4.2.3.sh
+   sh /root/klingel-dashboard-brume2_v4.2.4.sh
    ```
 3. Der Installer
    * installiert bei Bedarf **python3** (`opkg`),
@@ -170,6 +170,10 @@ Die Seiten sind für den Dauerbetrieb auf einem iPad im Querformat (1024×768) a
    `/root/Klingel-Dashboard/logs/klingel.log` (Zeilen mit `[IPAD1]`/`[IPAD2]`). Danach bleibt der Ton frei,
    solange die Seite offen ist; die Seite lädt sich dafür nie selbst neu.
 5. Lautstärke hoch, Lautlos-Schalter aus.
+6. **Blockierungsmodus (Lockdown Mode):** Ist er auf dem iPad an, schaltet Safari Web Audio
+   und WAV-Ton ab. Das Dashboard spielt den Klingelton dann als AAC/MP3 – das reicht.
+   Wer Web Audio zusätzlich möchte: in Safari auf „Aa“ bzw. das Seitenmenü tippen →
+   Website-Einstellungen → Blockierungsmodus für diese Website ausschalten.
 
 Damit das Bild über Tage stabil bleibt, verbindet die Seite den Videostrom alle
 20 Minuten unauffällig neu und bei Aussetzern sofort.
@@ -205,6 +209,12 @@ ist. Für Ton bei gesperrtem iPad: Lautlos-Schalter aus, Seite im Vordergrund la
 ---
 
 ## Versionsverlauf
+
+* **v4.2.4** – Klingelton als AAC/MP3
+  * Safari lehnte den WAV-Ton ab (Code 4) und Web Audio fehlte – typisch für den
+    Blockierungsmodus (Lockdown Mode). Die Brume erzeugt den Klingelton jetzt mit ffmpeg
+    zusätzlich als AAC (m4a) und MP3; das iPad nimmt das erste Format, das es abspielen kann
+  * Diagnosezeile im Protokoll: Web Audio vorhanden?, unterstützte Tonformate
 
 * **v4.2.3** – Tondatei auf dem iPad
   * Safari meldete „NotSupportedError“: sein Media-Player lehnte die Tondatei vom
