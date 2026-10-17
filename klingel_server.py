@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Klingel-Dashboard Brume 2  –  v4.2.2
+Klingel-Dashboard Brume 2  –  v4.2.3
 ====================================
 
 Laeuft auf einem GL.iNet Brume 2 (GL-MT2500, OpenWrt) im Autostart und stellt bereit:
@@ -37,7 +37,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
 APP_NAME = "Klingel-Dashboard Brume 2"
-APP_VERSION = "4.2.2"
+APP_VERSION = "4.2.3"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get("KLINGEL_CONFIG") or os.path.join(BASE_DIR, "config.ini")
@@ -1138,6 +1138,9 @@ class Handler(BaseHTTPRequestHandler):
     def _ranged(self, data, ctype):
         """Datei mit Range-Unterstuetzung (Safari auf iPad verlangt das fuer Audio)."""
         n = len(data)
+        # Safaris Media-Player erwartet HTTP/1.1 fuer Teilantworten
+        self.protocol_version = "HTTP/1.1"
+        self.close_connection = True
         rng = self.headers.get("Range", "")
         m = re.match(r"bytes=(\d*)-(\d*)$", rng.strip())
         if m and (m.group(1) or m.group(2)):
@@ -1149,6 +1152,7 @@ class Handler(BaseHTTPRequestHandler):
             b = min(b, n - 1)
             if a > b:
                 self.send_response(416)
+                self.send_header("Connection", "close")
                 self.send_header("Content-Range", "bytes */%d" % n)
                 self.send_header("Content-Length", "0")
                 self.end_headers()
@@ -1160,6 +1164,7 @@ class Handler(BaseHTTPRequestHandler):
             part = data
             self.send_response(200)
         self.send_header("Content-Type", ctype)
+        self.send_header("Connection", "close")
         self.send_header("Accept-Ranges", "bytes")
         self.send_header("Content-Length", str(len(part)))
         self.send_header("Cache-Control", "max-age=3600")

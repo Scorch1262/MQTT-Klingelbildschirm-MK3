@@ -1,4 +1,4 @@
-# Klingel-Dashboard Brume 2 – v4.2.2
+# Klingel-Dashboard Brume 2 – v4.2.3
 
 Klingel-Dashboard für den **GL.iNet Brume 2 (GL-MT2500)**. Es läuft im Autostart der
 Brume und ersetzt den PC (v2.x) bzw. das RP2350-Board (v3.x):
@@ -42,15 +42,15 @@ Kommt im Browser trotzdem kein Video an, wechselt das Dashboard automatisch auf
 
 ## Installation
 
-1. Die Datei `klingel-dashboard-brume2_v4.2.2.sh` auf die Brume kopieren,
+1. Die Datei `klingel-dashboard-brume2_v4.2.3.sh` auf die Brume kopieren,
    z. B. mit WinSCP (Protokoll SCP, Benutzer `root`) nach `/root/` oder per
    ```
-   scp -O klingel-dashboard-brume2_v4.2.2.sh root@<IP-der-Brume>:/root/
+   scp -O klingel-dashboard-brume2_v4.2.3.sh root@<IP-der-Brume>:/root/
    ```
 2. Per SSH auf der Brume anmelden und starten:
    ```
    ssh root@<IP-der-Brume>
-   sh /root/klingel-dashboard-brume2_v4.2.2.sh
+   sh /root/klingel-dashboard-brume2_v4.2.3.sh
    ```
 3. Der Installer
    * installiert bei Bedarf **python3** (`opkg`),
@@ -205,6 +205,13 @@ ist. Für Ton bei gesperrtem iPad: Lautlos-Schalter aus, Seite im Vordergrund la
 ---
 
 ## Versionsverlauf
+
+* **v4.2.3** – Tondatei auf dem iPad
+  * Safari meldete „NotSupportedError“: sein Media-Player lehnte die Tondatei vom
+    HTTP-Server ab. Der Klingelton wird jetzt vorab geladen und als Blob abgespielt;
+    Teilantworten (Range) kommen zusätzlich als HTTP/1.1
+  * Protokoll meldet auch Erfolg („Datei-Ton freigegeben“, „WebAudio aktiv“),
+    gleiche Meldungen nur noch einmal
 
 * **v4.2.2** – Ton-Freigabe auf dem iPad
   * echter Knopf „Klingelton einschalten“ im Bild, klingelt zur Bestätigung einmal

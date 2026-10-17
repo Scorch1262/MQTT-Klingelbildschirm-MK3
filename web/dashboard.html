@@ -291,14 +291,44 @@ function audioUi() {
   }
 }
 /* Diagnose: Meldungen ins Ereignis-Log UND ins Protokoll der Brume (logs/klingel.log) */
-function dlog(msg) {
-  addLog('AUDIO: ' + msg, 'er');
+var dlogLast = {}, sentInfo = {};
+function slog(text) {
   try {
     var x = new XMLHttpRequest();
     x.open('POST', '/api/log', true);
     x.setRequestHeader('Content-Type', 'text/plain');
-    x.send('AUDIO ' + msg + ' | ' + navigator.userAgent);
+    x.send(text);
   } catch (e) {}
+}
+function dlog(msg, info) {
+  var t = now();
+  if (dlogLast[msg] && t - dlogLast[msg] < 5000) return;   /* gleiche Meldung nicht mehrfach */
+  dlogLast[msg] = t;
+  addLog('AUDIO: ' + msg, info ? '' : 'er');
+  slog('AUDIO ' + msg + (sentInfo.ua ? '' : ' | ' + navigator.userAgent));
+  sentInfo.ua = true;
+}
+/* Tondatei als Blob laden: Safari spielt Blob-Adressen ohne die strengen
+   HTTP-Range-Anforderungen seines Media-Players ab (Ursache "NotSupportedError"). */
+var bellBlobUrl = '', bellLoadTried = false;
+function loadBellBlob() {
+  if (bellLoadTried) return;
+  bellLoadTried = true;
+  try {
+    var x = new XMLHttpRequest();
+    x.open('GET', '/klingel.wav?v=' + CFG.version, true);
+    x.responseType = 'arraybuffer';
+    x.onload = function () {
+      if (x.status !== 200 || !x.response) { dlog('Tondatei nicht geladen (HTTP ' + x.status + ')'); return; }
+      try {
+        var blob = new Blob([x.response], { type: 'audio/wav' });
+        bellBlobUrl = (window.URL || window.webkitURL).createObjectURL(blob);
+        if (bellEl) { bellEl.src = bellBlobUrl; try { bellEl.load(); } catch (e) {} }
+      } catch (e) { dlog('Blob nicht möglich: ' + e.name); }
+    };
+    x.onerror = function () { dlog('Tondatei-Download fehlgeschlagen'); };
+    x.send(null);
+  } catch (e) { dlog('Tondatei-Download Fehler: ' + e.name); }
 }
 function makeBellEl() {
   if (bellEl) return;
@@ -307,12 +337,18 @@ function makeBellEl() {
     bellEl.setAttribute('playsinline', '');
     bellEl.setAttribute('webkit-playsinline', '');
     bellEl.preload = 'auto';
-    bellEl.src = '/klingel.wav';
+    if (bellBlobUrl) bellEl.src = bellBlobUrl;
     bellEl.addEventListener('error', function () {
-      dlog('Datei-Fehler, Code ' + (bellEl.error ? bellEl.error.code : '?'));
+      if (bellEl.src.indexOf('blob:') === 0) {
+        dlog('Blob-Ton nicht abspielbar (Code ' + (bellEl.error ? bellEl.error.code : '?') + ') – nutze Datei-Adresse');
+        bellEl.src = '/klingel.wav?v=' + CFG.version;
+      } else {
+        dlog('Datei-Fehler, Code ' + (bellEl.error ? bellEl.error.code : '?'));
+      }
     }, false);
     document.body.appendChild(bellEl);
   } catch (e) { bellEl = null; dlog('kein <audio> möglich: ' + e.name); }
+  loadBellBlob();
 }
 /* Web Audio: im Berührungs-Handler anlegen/fortsetzen (so verlangt es Safari auf dem iPad) */
 function webUnlock() {
@@ -328,6 +364,7 @@ function webUnlock() {
     }
     var c = actx;
     setTimeout(function () {
+      if (c === actx && c.state === 'running') dlog('WebAudio aktiv', true);
       if (c === actx && c.state !== 'running') {
         dlog('WebAudio bleibt "' + c.state + '" – wird beim nächsten Tippen neu angelegt');
         try { c.close(); } catch (e) {}
@@ -343,12 +380,13 @@ var htmlBusySince = 0;
 function htmlUnlock() {
   makeBellEl();
   if (!bellEl || htmlOk) return;
+  if (!bellEl.getAttribute('src')) bellEl.src = bellBlobUrl || ('/klingel.wav?v=' + CFG.version);
   if (htmlBusy && now() - htmlBusySince < 3000) return;
   htmlBusy = true; htmlBusySince = now();
   try {
     bellEl.muted = false;
     var p = bellEl.play();
-    var ok = function () { try { bellEl.pause(); bellEl.currentTime = 0; } catch (e) {} htmlOk = true; htmlBusy = false; audioUi(); };
+    var ok = function () { try { bellEl.pause(); bellEl.currentTime = 0; } catch (e) {} htmlOk = true; htmlBusy = false; dlog('Datei-Ton freigegeben', true); audioUi(); };
     if (p && p.then) p.then(ok, function (e) { htmlBusy = false; dlog('Datei-Ton abgelehnt: ' + (e && e.name) + ' ' + (e && e.message)); audioUi(); });
     else setTimeout(ok, 80);
   } catch (e) { htmlBusy = false; dlog('play() Fehler: ' + e.name); }
