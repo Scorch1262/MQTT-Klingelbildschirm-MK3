@@ -1,4 +1,4 @@
-# Klingel-Dashboard Brume 2 – v4.0.1
+# Klingel-Dashboard Brume 2 – v4.1.0
 
 Klingel-Dashboard für den **GL.iNet Brume 2 (GL-MT2500)**. Es läuft im Autostart der
 Brume und ersetzt den PC (v2.x) bzw. das RP2350-Board (v3.x):
@@ -6,7 +6,7 @@ Brume und ersetzt den PC (v2.x) bzw. das RP2350-Board (v3.x):
 | Port (Standard) | Seite        | Inhalt |
 |-----------------|--------------|--------|
 | **8081**        | Dashboard 1  | Kamerabild, Klingel-Symbole, Öffner-Taste |
-| **8082**        | Dashboard 2  | gleiche Oberfläche, eigene Kamera, eigene Klingel-Topics |
+| **8082**        | Dashboard 2  | gleiche Oberfläche, **dasselbe Kamerabild**, eigene Klingel-Topics |
 | **8083**        | Einrichtung  | Broker, Öffner, Topics, Kameras, Ports, Kameratest |
 
 * Beide Dashboards senden beim Drücken der Öffnen-Taste **denselben MQTT-Befehl an
@@ -41,15 +41,15 @@ Kommt im Browser trotzdem kein Video an, wechselt das Dashboard automatisch auf
 
 ## Installation
 
-1. Die Datei `klingel-dashboard-brume2_v4.0.1.sh` auf die Brume kopieren,
+1. Die Datei `klingel-dashboard-brume2_v4.1.0.sh` auf die Brume kopieren,
    z. B. mit WinSCP (Protokoll SCP, Benutzer `root`) nach `/root/` oder per
    ```
-   scp -O klingel-dashboard-brume2_v4.0.1.sh root@<IP-der-Brume>:/root/
+   scp -O klingel-dashboard-brume2_v4.1.0.sh root@<IP-der-Brume>:/root/
    ```
 2. Per SSH auf der Brume anmelden und starten:
    ```
    ssh root@<IP-der-Brume>
-   sh /root/klingel-dashboard-brume2_v4.0.1.sh
+   sh /root/klingel-dashboard-brume2_v4.1.0.sh
    ```
 3. Der Installer
    * installiert bei Bedarf **python3** (`opkg`),
@@ -118,12 +118,15 @@ Nach einer Änderung von Hand: `/etc/init.d/klingel-dashboard restart`.
 
 ## Kamera einrichten
 
+Es gibt **eine Kamera (einen RTSP-Stream)**, die auf **beiden Dashboards** angezeigt wird.
+ffmpeg holt den Stream nur einmal ab und verteilt die Bilder an alle geöffneten Seiten.
+
+
 * **Kamera-URL:** dieselbe wie in VLC, z. B. `rtsp://192.168.1.200:554/stream2`.
   Benutzer und Passwort am besten in die eigenen Felder eintragen – Sonderzeichen
   wie `@ # : /` im Passwort werden dann richtig behandelt.
 * **Substream nehmen** (z. B. 640×360 oder 1280×720). Die Brume muss jedes Bild
-  dekodieren; ein 4K- oder 1080p-Hauptstream mit 25 B/s belastet ihre CPU stark,
-  bei zwei Kameras doppelt.
+  dekodieren; ein 4K- oder 1080p-Hauptstream mit 25 B/s belastet ihre CPU stark.
 * **Bilder pro Sekunde** (Standard 8), **maximale Breite** (960) und
   **JPEG-Qualität** (75 %) bestimmen Last und Datenmenge fürs iPad.
 * **Sparmodus:** nur Schlüsselbilder dekodieren – sehr wenig CPU, dafür meist nur
@@ -175,11 +178,16 @@ ist. Für Ton bei gesperrtem iPad: Lautlos-Schalter aus, Seite im Vordergrund la
 | `GET /api/status` | Version, IPs, MQTT, ffmpeg, Kameras |
 | `POST /api/test_cam` | Kamera einmalig testen |
 | `POST /api/test_bell` | Testklingeln (ohne MQTT) |
-| `GET /cam/1/snapshot.jpg` | Vorschaubild |
+| `GET /cam/snapshot.jpg` | Vorschaubild |
 
 ---
 
 ## Versionsverlauf
+
+* **v4.1.0** – eine Kamera für beide Dashboards
+  * nur noch ein RTSP-Stream (Abschnitt `[kamera]` in der config.ini), ein ffmpeg-Prozess
+  * Einrichtungsseite mit einer Kamerakarte, Dashboard-Karten nur noch Port, Titel, Klingeln
+  * alte config.ini: die Kamera von Dashboard 1 wird automatisch übernommen
 
 * **v4.0.1** – alles in einem Ordner `/root/Klingel-Dashboard`
   * Ordner wird als Erstes angelegt (auch bei Abbruch sichtbar, mit `logs/install.log`)

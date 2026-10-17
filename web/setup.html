@@ -85,7 +85,7 @@ button.mini { padding: 8px 0; width: 100%; font-size: 10px; }
 <body>
 <header>
   <h1>Klingel<span>Einrichtung</span></h1>
-  <div class="hdr mono"><span class="dot" id="dotMqtt"></span><span>MQTT</span><span class="dot" id="dotCam1"></span><span>CAM1</span><span class="dot" id="dotCam2"></span><span>CAM2</span><span>v{{VERSION}}</span></div>
+  <div class="hdr mono"><span class="dot" id="dotMqtt"></span><span>MQTT</span><span class="dot" id="dotCam1"></span><span>CAM</span><span>v{{VERSION}}</span></div>
 </header>
 
 <main>
@@ -161,7 +161,16 @@ function simpleSection(sec, title, layout) {
 function siteCard(n) {
   var s = 'dashboard' + n, h = '<div class="row">';
   h += input(F(s, 'port'), 'w25') + input(F(s, 'titel'), 'w75') + '</div>';
-  h += '<div class="sub">Kamera</div>';
+  h += '<div class="sub">Klingeln · leeres Topic = ausgeblendet · leere Payload = jede Nachricht</div>';
+  for (var b = 1; b <= NUM_BELLS; b++) {
+    h += '<div class="bellrow">' + input(F(s, 'klingel' + b + '_name'), 'b1', 'Name') + input(F(s, 'klingel' + b + '_topic'), 'b2', 'Topic ' + b) +
+      input(F(s, 'klingel' + b + '_payload'), 'b3', 'Payload') +
+      '<div class="f b4"><button class="btn mini" type="button" onclick="testBell(' + n + ',' + b + ')">Test</button></div></div>';
+  }
+  return card('Dashboard ' + n, h, '<a id="lnk' + n + '" target="_blank" href="#">öffnen ↗</a>');
+}
+function camCard() {
+  var s = 'kamera', n = 1, h = '<div class="hint mono dim" style="font-size:11px;margin-bottom:10px">Ein RTSP-Stream – wird auf beiden Dashboards angezeigt (ffmpeg läuft nur einmal).</div>';
   h += '<div class="preview"><img id="pv' + n + '" alt=""><div class="pv-txt mono" id="pvt' + n + '">Vorschau …</div></div>';
   h += '<div class="camstate mono" id="cs' + n + '"></div>';
   h += '<div class="row">' + input(F(s, 'kamera_typ'), 'w33') + input(F(s, 'rtsp_transport'), 'w33') + input(F(s, 'bildmodus'), 'w33') + '</div>';
@@ -171,13 +180,7 @@ function siteCard(n) {
   h += '<div class="row">' + input(F(s, 'sparmodus'), 'w50') + input(F(s, 'immer_aktiv'), 'w50') + '</div>';
   h += '<button class="btn" type="button" onclick="testCam(' + n + ')">Kamera mit diesen Werten testen</button> <span class="mono dim" id="tcs' + n + '" style="font-size:11px"></span>';
   h += '<pre class="logbox mono" id="tlog' + n + '"></pre>';
-  h += '<div class="sub">Klingeln · leeres Topic = ausgeblendet · leere Payload = jede Nachricht</div>';
-  for (var b = 1; b <= NUM_BELLS; b++) {
-    h += '<div class="bellrow">' + input(F(s, 'klingel' + b + '_name'), 'b1', 'Name') + input(F(s, 'klingel' + b + '_topic'), 'b2', 'Topic ' + b) +
-      input(F(s, 'klingel' + b + '_payload'), 'b3', 'Payload') +
-      '<div class="f b4"><button class="btn mini" type="button" onclick="testBell(' + n + ',' + b + ')">Test</button></div></div>';
-  }
-  return card('Dashboard ' + n, h, '<a id="lnk' + n + '" target="_blank" href="#">öffnen ↗</a>');
+  return card('Kamera – beide Dashboards', h);
 }
 
 function build() {
@@ -185,9 +188,8 @@ function build() {
   a += simpleSection('mqtt', 'MQTT-Broker', { broker: 'w75', port: 'w25', benutzer: 'w50', passwort: 'w50', client_id: 'w100' });
   a += simpleSection('oeffner', 'Türöffner – beide Dashboards senden diesen Befehl', { topic_druecken: 'w50', payload_druecken: 'w50', topic_loslassen: 'w50', payload_loslassen: 'w50' });
   a += simpleSection('allgemein', 'Allgemein', { einrichtung_port: 'w50', admin_passwort: 'w50' });
-  a += siteCard(1);
-  b += siteCard(2);
-  for (var n = 3; n <= NUM_SITES; n++) b += siteCard(n);
+  b += camCard();
+  for (var n = 1; n <= NUM_SITES; n++) b += siteCard(n);
   $('colA').innerHTML = a;
   $('colB').innerHTML = b;
 }
@@ -239,9 +241,8 @@ function loadStatus() {
       '<b>MQTT</b><span class="' + (st.mqtt ? 'ok' : 'bad') + '">' + esc(st.mqtt_state) + '</span><br>' +
       '<b>ffmpeg</b><span>' + ffTxt + '</span><br>' +
       '<b>Konfiguration</b><span>' + esc(st.config) + '</span>';
-    for (var c = 1; c <= NUM_SITES; c++) {
-      var cs = st.cams[String(c)];
-      if (!cs) continue;
+    var c = 1, cs = st.cam;
+    if (cs) {
       $('dotCam' + c) && ($('dotCam' + c).className = 'dot' + (cs.state === 'laeuft' ? ' on' : ''));
       var t = '<span class="' + (cs.state === 'laeuft' ? 'ok' : (cs.state === 'fehler' ? 'bad' : 'dim')) + '">' + (STATE_TXT[cs.state] || cs.state) + '</span>';
       if (cs.state === 'laeuft') t += ' · ' + cs.w + '×' + cs.h + ' · ' + cs.fps + ' B/s';
@@ -257,12 +258,12 @@ function previewLoop(n) {
   var to = setTimeout(function () { if (!done) { done = true; setTimeout(function () { previewLoop(n); }, 2000); } }, 12000);
   im.onload = function () { if (done) return; done = true; clearTimeout(to); $('pv' + n).src = im.src; $('pvt' + n).style.display = 'none'; setTimeout(function () { previewLoop(n); }, 1000); };
   im.onerror = function () { if (done) return; done = true; clearTimeout(to); $('pvt' + n).style.display = ''; $('pvt' + n).innerHTML = 'kein Bild'; setTimeout(function () { previewLoop(n); }, 3000); };
-  im.src = '/cam/' + n + '/snapshot.jpg?t=' + new Date().getTime();
+  im.src = '/cam/snapshot.jpg?t=' + new Date().getTime();
 }
 
 function testCam(n) {
   var vals = collect(), out = {};
-  for (var k in vals) if (vals.hasOwnProperty(k) && k.indexOf('dashboard' + n + '.') === 0) out[k] = vals[k];
+  for (var k in vals) if (vals.hasOwnProperty(k) && k.indexOf('kamera.') === 0) out[k] = vals[k];
   $('tcs' + n).innerHTML = 'teste … (bis 20 s)';
   $('tlog' + n).style.display = 'none';
   req('POST', '/api/test_cam', { site: n, values: out }, function (d) {
@@ -316,7 +317,7 @@ req('GET', '/api/schema', null, function (s) {
   req('GET', '/api/settings', null, function (d) {
     fill(d);
     loadStatus(); setInterval(loadStatus, 3000);
-    for (var n = 1; n <= NUM_SITES; n++) previewLoop(n);
+    previewLoop(1);
   }, function (e) { setMsg('Einstellungen nicht ladbar: ' + e, 'err'); });
 }, function (e) { setMsg('Brume nicht erreichbar: ' + e, 'err'); });
 </script>

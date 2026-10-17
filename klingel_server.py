@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Klingel-Dashboard Brume 2  –  v4.0.1
+Klingel-Dashboard Brume 2  –  v4.1.0
 ====================================
 
 Laeuft auf einem GL.iNet Brume 2 (GL-MT2500, OpenWrt) im Autostart und stellt bereit:
 
   * Dashboard 1 (Standard-Port 8081) und Dashboard 2 (Standard-Port 8082)
-      - Kamerabild (RTSP -> ffmpeg -> MJPEG, auch fuer iPad mini 1 / iOS 9)
+      - dasselbe Kamerabild auf beiden (ein RTSP-Stream -> ffmpeg -> MJPEG, auch iOS 9)
       - Türöffner-Taste: beide Dashboards senden denselben MQTT-Befehl an denselben Broker
       - bis zu 3 Klingel-Symbole je Dashboard mit eigenen MQTT-Topics, Klingelton im Browser
   * Einrichtungsseite (Standard-Port 8083): Broker, Topics, Kameras, Ports, Kameratest
@@ -36,7 +36,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
 APP_NAME = "Klingel-Dashboard Brume 2"
-APP_VERSION = "4.0.1"
+APP_VERSION = "4.1.0"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get("KLINGEL_CONFIG") or os.path.join(BASE_DIR, "config.ini")
@@ -106,16 +106,14 @@ def build_schema():
         _f("oeffner", "wiederholung_ms", "int", 500, "Wiederholung solange gedrückt (ms)",
            "der Drücken-Befehl wird in diesem Abstand wiederholt", min=100, max=5000),
     ]
-    for n in range(1, NUM_SITES + 1):
-        sec = "dashboard%d" % n
-        s += [
-            _f(sec, "port", "port", 8080 + n, "Port"),
-            _f(sec, "titel", "str", "Eingang %d" % n, "Titel"),
+    # Eine Kamera (ein RTSP-Stream) für beide Dashboards
+    sec = "kamera"
+    s += [
             _f(sec, "kamera_typ", "choice", "rtsp", "Kameraquelle",
                "rtsp = Videostream über ffmpeg (RTSP oder HTTP), jpeg = Standbild-URL der Kamera",
                options=["rtsp", "jpeg", "aus"]),
             _f(sec, "kamera_url", "str",
-               "rtsp://192.168.1.%d:554/stream2" % (199 + n), "Kamera-URL",
+               "rtsp://192.168.1.200:554/stream2", "Kamera-URL",
                "dieselbe URL wie in VLC; Zugangsdaten besser in die Felder darunter"),
             _f(sec, "kamera_benutzer", "str", "", "Kamera-Benutzer"),
             _f(sec, "kamera_passwort", "pass", "", "Kamera-Passwort"),
@@ -132,6 +130,12 @@ def build_schema():
             _f(sec, "bildmodus", "choice", "auto", "Bildmodus im Browser",
                "auto = Video (MJPEG), bei Problemen automatisch Einzelbilder",
                options=["auto", "mjpeg", "einzelbild"]),
+    ]
+    for n in range(1, NUM_SITES + 1):
+        sec = "dashboard%d" % n
+        s += [
+            _f(sec, "port", "port", 8080 + n, "Port"),
+            _f(sec, "titel", "str", "Eingang %d" % n, "Titel"),
         ]
         for b in range(1, NUM_BELLS + 1):
             s += [
@@ -145,10 +149,12 @@ def build_schema():
 
 
 SCHEMA = build_schema()
+CAM_KEYS = [f["key"] for f in SCHEMA if f["sec"] == "kamera"]
 SECTION_TITLES = {
     "allgemein": "Allgemein",
     "mqtt": "MQTT-Broker",
     "oeffner": "Türöffner (beide Dashboards)",
+    "kamera": "Kamera (beide Dashboards)",
 }
 for _n in range(1, NUM_SITES + 1):
     SECTION_TITLES["dashboard%d" % _n] = "Dashboard %d" % _n
@@ -213,6 +219,13 @@ def load_config():
     raw = read_ini(CONFIG_PATH)
     cfg = {}
     problems = []
+    migrated = False
+    if raw is not None and not any(k.startswith("kamera.") for k in raw):
+        # v4.0.x hatte je Dashboard eine Kamera -> Kamera von Dashboard 1 übernehmen
+        for k in list(raw):
+            if k.startswith("dashboard1.") and k.split(".", 1)[1] in CAM_KEYS:
+                raw["kamera." + k.split(".", 1)[1]] = raw[k]
+                migrated = True
     for f in SCHEMA:
         k = fid(f)
         if raw is not None and k in raw:
@@ -226,6 +239,9 @@ def load_config():
     if raw is None:
         save_config(cfg)
         log("CFG", "config.ini neu angelegt: %s" % CONFIG_PATH)
+    elif migrated:
+        save_config(cfg)
+        log("CFG", "Kamera-Einstellungen von Dashboard 1 als gemeinsame Kamera übernommen")
     for p in problems:
         log("CFG", "WARNUNG %s -> Standardwert" % p)
     return cfg
@@ -272,6 +288,11 @@ def save_config(cfg):
 
 
 CFG = load_config()
+
+
+def cam_cfg():
+    """Einstellungen der gemeinsamen Kamera."""
+    return {k[7:]: v for k, v in CFG.items() if k.startswith("kamera.")}
 
 
 def site_cfg(n):
@@ -736,10 +757,10 @@ def fetch_jpeg(url, user, pw, timeout):
 # ═══════════════════════════════════════════════════════════════════════════
 
 class Camera(threading.Thread):
-    def __init__(self, n):
-        threading.Thread.__init__(self, daemon=True, name="cam%d" % n)
-        self.n = n
-        self.cfg = site_cfg(n)
+    def __init__(self):
+        threading.Thread.__init__(self, daemon=True, name="kamera")
+        self.n = 1
+        self.cfg = cam_cfg()
         self.cond = threading.Condition()
         self.frame = None
         self.frame_id = 0
@@ -808,7 +829,7 @@ class Camera(threading.Thread):
             self.state = "laeuft"
             self.message = ""
             self.detail = ""
-            log("CAM%d" % self.n, "Bild empfangen (%dx%d)" % jpeg_size(data))
+            log("KAMERA", "Bild empfangen (%dx%d)" % jpeg_size(data))
 
     def status(self):
         age = time.time() - self.frame_time if self.frame_time else None
@@ -839,7 +860,7 @@ class Camera(threading.Thread):
                     ok = self._run_ffmpeg()
             except Exception as e:  # noqa
                 self.state, self.message = "fehler", "interner Fehler: %s" % e
-                log("CAM%d" % self.n, self.message)
+                log("KAMERA", self.message)
             if self.stop_evt.is_set():
                 break
             if ok:
@@ -858,7 +879,7 @@ class Camera(threading.Thread):
         args = ffmpeg_args(self.cfg, url)
         if self.state != "laeuft":
             self.state, self.message = "verbinde", "verbinde mit Kamera ..."
-        log("CAM%d" % self.n, "starte ffmpeg: %s" % mask_url(url))
+        log("KAMERA", "starte ffmpeg: %s" % mask_url(url))
         err_lines = []
         proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
         self.proc = proc
@@ -929,7 +950,7 @@ class Camera(threading.Thread):
             self.state = "fehler"
             self.message = hint or err_lines[-1][:160]
             self.detail = err[-1200:]
-            log("CAM%d" % self.n, "ffmpeg: %s" % (err_lines[-1][:200]))
+            log("KAMERA", "ffmpeg: %s" % (err_lines[-1][:200]))
         elif proc.returncode not in (0, None) and self.state != "fehler":
             self.state, self.message = "fehler", "ffmpeg beendet (Code %s)" % proc.returncode
         if self.state == "laeuft":
@@ -968,7 +989,7 @@ class Camera(threading.Thread):
                 pass
 
 
-CAMERAS = {}
+CAMERA = None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1056,12 +1077,12 @@ def template(name):
 
 
 def site_client_config(n):
-    sc = site_cfg(n)
+    sc, cc = site_cfg(n), cam_cfg()
     return {
         "site": n, "title": sc["titel"] or ("Dashboard %d" % n), "version": APP_VERSION,
         "repeat_ms": CFG["oeffner.wiederholung_ms"],
-        "cam": sc["kamera_typ"] != "aus" and bool(sc["kamera_url"].strip()),
-        "bildmodus": sc["bildmodus"], "fps": sc["bilder_pro_sekunde"],
+        "cam": cc["kamera_typ"] != "aus" and bool(cc["kamera_url"].strip()),
+        "bildmodus": cc["bildmodus"], "fps": cc["bilder_pro_sekunde"],
         "bells": [{"id": b["id"], "name": b["name"]} for b in site_bells(n)],
     }
 
@@ -1213,7 +1234,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _site_get(self, n):
         p = self._route()
-        cam = CAMERAS[n]
+        cam = CAMERA
         if p in ("/", "/index.html"):
             cfg = site_client_config(n)
             html = template("dashboard.html")
@@ -1273,10 +1294,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(out)
         if p == "/api/status":
             return self._json(system_status())
-        m = re.match(r"^/cam/(\d+)/(stream\.mjpg|snapshot\.jpg)$", p)
-        if m and int(m.group(1)) in CAMERAS:
-            cam = CAMERAS[int(m.group(1))]
-            return self._mjpeg(cam) if m.group(2) == "stream.mjpg" else self._snapshot(cam)
+        m = re.match(r"^/cam(?:/\d+)?/(stream\.mjpg|snapshot\.jpg)$", p)
+        if m:
+            return self._mjpeg(CAMERA) if m.group(1) == "stream.mjpg" else self._snapshot(CAMERA)
         if p == "/favicon.ico":
             return self._send(204, b"")
         self._send(404, "Nicht gefunden")
@@ -1297,11 +1317,10 @@ class Handler(BaseHTTPRequestHandler):
             schedule_restart()
             return
         if p == "/api/test_cam":
-            n = int(data.get("site") or 1)
             vals = data.get("values") or {}
             cam = {}
             for f in SCHEMA:
-                if f["sec"] != "dashboard%d" % n:
+                if f["sec"] != "kamera":
                     continue
                 k = fid(f)
                 v = vals.get(k, CFG[k])
@@ -1378,11 +1397,9 @@ def validate_settings(data):
             errors.append("Port %d wird schon von einem anderen Programm benutzt" % p)
     if not new["oeffner.topic_druecken"]:
         errors.append("Topic beim Drücken darf nicht leer sein")
-    for n in range(1, NUM_SITES + 1):
-        u = new["dashboard%d.kamera_url" % n].strip().lower()
-        t = new["dashboard%d.kamera_typ" % n]
-        if t == "jpeg" and u and not u.startswith(("http://", "https://")):
-            errors.append("Dashboard %d: Standbild-URL muss mit http:// beginnen" % n)
+    u = new["kamera.kamera_url"].strip().lower()
+    if new["kamera.kamera_typ"] == "jpeg" and u and not u.startswith(("http://", "https://")):
+        errors.append("Kamera: Standbild-URL muss mit http:// beginnen")
     return new, ("; ".join(errors) if errors else "")
 
 
@@ -1391,7 +1408,7 @@ def system_status():
         "name": APP_NAME, "version": APP_VERSION, "uptime_s": int(time.time() - START_TIME),
         "mqtt": bool(MQTT and MQTT.connected), "mqtt_state": MQTT.state if MQTT else "-",
         "ffmpeg": FFMPEG, "ips": local_ips(), "ports": all_ports(),
-        "cams": {str(n): CAMERAS[n].status() for n in CAMERAS},
+        "cam": CAMERA.status(),
         "titles": {str(n): CFG["dashboard%d.titel" % n] for n in range(1, NUM_SITES + 1)},
         "python": sys.version.split()[0], "config": CONFIG_PATH,
     }
@@ -1402,9 +1419,10 @@ def system_status():
 # ═══════════════════════════════════════════════════════════════════════════
 
 def shutdown_children():
-    for c in CAMERAS.values():
-        c.stop()
-    for c in CAMERAS.values():
+    if CAMERA is None:
+        return
+    CAMERA.stop()
+    for c in (CAMERA,):
         p = c.proc
         if p and p.poll() is None:
             try:
@@ -1442,16 +1460,15 @@ def on_signal(signum, frame):
 
 
 def main():
-    global MQTT
+    global MQTT, CAMERA
     signal.signal(signal.SIGTERM, on_signal)
     signal.signal(signal.SIGINT, on_signal)
     log("SYS", "%s v%s startet (Python %s)" % (APP_NAME, APP_VERSION, sys.version.split()[0]))
     log("SYS", "Konfiguration: %s" % CONFIG_PATH)
     find_ffmpeg()
 
-    for n in range(1, NUM_SITES + 1):
-        CAMERAS[n] = Camera(n)
-        CAMERAS[n].start()
+    CAMERA = Camera()
+    CAMERA.start()
 
     MQTT = MQTTClient(on_mqtt_message)
     MQTT.start()

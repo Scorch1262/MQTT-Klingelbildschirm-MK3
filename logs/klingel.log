@@ -1,0 +1,12 @@
+2026-10-17 [09:22:44] [CFG] Kamera-Einstellungen von Dashboard 1 als gemeinsame Kamera übernommen
+2026-10-17 [09:22:44] [SYS] Klingel-Dashboard Brume 2 v4.1.0 startet (Python 3.13.16)
+2026-10-17 [09:22:44] [SYS] Konfiguration: /tmp/claude-0/-home-claude/7bfa212c-0761-5693-952c-5c2653311de0/scratchpad/run/config.ini
+2026-10-17 [09:22:44] [FFMPEG] /usr/bin/ffmpeg (Version 6.1.1-3ubuntu5, H.264: ja, H.265: ja)
+2026-10-17 [09:22:44] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
+2026-10-17 [09:22:44] [SYS] ==========================================================
+2026-10-17 [09:22:44] [SYS] Dashboard 1:  http://192.0.2.2:8081   (Haustür)
+2026-10-17 [09:22:44] [SYS] Dashboard 2:  http://192.0.2.2:8082   (Garage)
+2026-10-17 [09:22:44] [SYS] Einrichtung:  http://192.0.2.2:8083
+2026-10-17 [09:22:44] [SYS] ==========================================================
+2026-10-17 [09:22:55] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1
+2026-10-17 [09:22:59] [KAMERA] Bild empfangen (960x540)
