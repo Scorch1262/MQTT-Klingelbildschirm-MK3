@@ -51,6 +51,14 @@ header h1 span.acc { color: #ff9142; }
   box-shadow: 0 4px 24px rgba(0,0,0,0.6); z-index: 5;
   -webkit-animation: blink 1.6s ease-in-out infinite; animation: blink 1.6s ease-in-out infinite; }
 .clock { font-size: 12px; color: #8891a0; margin-left: 12px; }
+.wx { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
+  margin-left: 14px; padding: 3px 10px 3px 6px; border: 1px solid #242a33; border-radius: 20px; background: #12151a; }
+.wx svg { display: block; margin-right: 6px; }
+.wx .t { font-size: 15px; font-weight: 600; color: #e5e8ec; letter-spacing: 0.02em; }
+.wx .o { font-size: 9px; color: #8891a0; margin-left: 7px; letter-spacing: 0.04em; max-width: 120px;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-transform: uppercase; }
+.wx.old .t { color: #8891a0; }
+.wx.err .t { color: #ff5d5d; font-size: 11px; font-weight: 400; }
 
 /* ── Layout ── */
 .layout { position: absolute; top: 52px; left: 0; right: 0; bottom: 0; }
@@ -167,6 +175,7 @@ header h1 span.acc { color: #ff9142; }
     <span class="dot" id="camDot"></span><span class="lbl">CAM</span>
     <span class="audio-hint" id="audioHint" style="display:none">TON AUS – BITTE ANTIPPEN</span>
     <span class="dot" id="audioDot"></span><span class="lbl" id="audioLbl" style="cursor:pointer">AUDIO</span>
+    <span class="wx mono" id="wx" style="display:none"><span id="wxIcon"></span><span class="t" id="wxTemp">--</span><span class="o" id="wxOrt"></span></span>
     <span class="clock" id="clock">--:--:--</span>
     <span class="lbl">v{{VERSION}}</span>
   </div>
@@ -591,6 +600,43 @@ function camUpdate(c) {
   }
 }
 
+/* ═════════════ AUSSENTEMPERATUR ═════════════ */
+var WX_SVG = {
+  sonne: '<circle cx="12" cy="12" r="4.2" fill="#ffb648" stroke="none"/><g stroke="#ffb648" stroke-width="1.8" stroke-linecap="round"><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M5.3 18.7L7 17M17 7l1.7-1.7"/></g>',
+  mond: '<path d="M15.5 3.5a8.5 8.5 0 1 0 5 13.6A7 7 0 0 1 15.5 3.5z" fill="#c9ced6" stroke="none"/>',
+  wolke: '<path d="M7 18.5h10a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.4A3.3 3.3 0 0 0 7 18.5z" fill="#8891a0" stroke="none"/>',
+  'wolke-sonne': '<circle cx="8" cy="8" r="3.3" fill="#ffb648"/><path d="M8.5 19.5h9a3.6 3.6 0 0 0 .3-7.2 5 5 0 0 0-9.6 1.3 3 3 0 0 0 .3 5.9z" fill="#a9b0bc"/>',
+  'wolke-mond': '<path d="M9.5 3a5 5 0 1 0 3.6 8.4A4.2 4.2 0 0 1 9.5 3z" fill="#c9ced6"/><path d="M8.5 19.5h9a3.6 3.6 0 0 0 .3-7.2 5 5 0 0 0-9.6 1.3 3 3 0 0 0 .3 5.9z" fill="#8891a0"/>',
+  regen: '<path d="M7 14.5h10a3.6 3.6 0 0 0 .4-7.2 5 5 0 0 0-9.6 1.3A3 3 0 0 0 7 14.5z" fill="#8891a0"/><g stroke="#4aa8ff" stroke-width="1.8" stroke-linecap="round"><path d="M8.5 17l-1 2.5M12.5 17l-1 2.5M16.5 17l-1 2.5"/></g>',
+  schnee: '<path d="M7 14.5h10a3.6 3.6 0 0 0 .4-7.2 5 5 0 0 0-9.6 1.3A3 3 0 0 0 7 14.5z" fill="#8891a0"/><g fill="#e5e8ec"><circle cx="8.5" cy="18.5" r="1.1"/><circle cx="12" cy="20" r="1.1"/><circle cx="15.5" cy="18.5" r="1.1"/></g>',
+  nebel: '<g stroke="#8891a0" stroke-width="1.8" stroke-linecap="round"><path d="M4 9h16M6 13h12M4 17h16"/></g>',
+  gewitter: '<path d="M7 13.5h10a3.6 3.6 0 0 0 .4-7.2 5 5 0 0 0-9.6 1.3A3 3 0 0 0 7 13.5z" fill="#8891a0"/><path d="M12.5 14l-2.5 4h2.5l-1.5 4 4-5.5h-2.5l1.5-2.5z" fill="#ffd34d"/>'
+};
+function fmtTemp(v) { if (v === null || v === undefined) return '--'; var r = Math.round(v * 10) / 10; return String(r).replace('.', ',') + '°'; }
+var wxLast = '';
+function wxUpdate(w) {
+  var box = $('wx');
+  if (!w.aktiv) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  if (!w.ok && (w.temp === null || w.temp === undefined)) {
+    box.className = 'wx mono err';
+    $('wxIcon').innerHTML = '';
+    $('wxTemp').innerHTML = 'Außentemp.: ' + (w.msg && w.msg.indexOf('kein Ort') >= 0 ? 'Ort einrichten' : 'kein Internet');
+    $('wxOrt').innerHTML = '';
+    if (wxLast !== 'err' + w.msg) { wxLast = 'err' + w.msg; addLog('WETTER: ' + (w.msg || 'nicht verfügbar'), 'er'); }
+    return;
+  }
+  box.className = 'wx mono' + (w.veraltet ? ' old' : '');
+  $('wxIcon').innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none">' + (WX_SVG[w.icon] || WX_SVG.wolke) + '</svg>';
+  $('wxTemp').innerHTML = fmtTemp(w.temp) + 'C';
+  var ort = w.ort ? String(w.ort).split(',')[0] : '';
+  $('wxOrt').innerHTML = '';
+  $('wxOrt').appendChild(document.createTextNode(ort));
+  box.title = (w.text || '') + (w.gefuehlt !== undefined ? ' · gefühlt ' + fmtTemp(w.gefuehlt) : '') +
+    (w.min !== null && w.min !== undefined ? ' · heute ' + fmtTemp(w.min) + ' bis ' + fmtTemp(w.max) : '') +
+    (w.veraltet ? ' · Stand vor ' + w.alter_min + ' min' : '');
+}
+
 /* ═════════════ STATUS-ABFRAGE ═════════════ */
 var pollFails = 0, online = null;
 function poll() {
@@ -613,6 +659,7 @@ function poll() {
       }
     }
     if (d.cam) camUpdate(d.cam);
+    if (d.wetter) wxUpdate(d.wetter);
     setTimeout(poll, 600);
   }, function () {
     pollFails++;

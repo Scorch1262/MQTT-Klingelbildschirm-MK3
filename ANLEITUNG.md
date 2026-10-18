@@ -1,4 +1,4 @@
-# Klingel-Dashboard Brume 2 – v4.2.4
+# Klingel-Dashboard Brume 2 – v4.3.0
 
 Klingel-Dashboard für den **GL.iNet Brume 2 (GL-MT2500)**. Es läuft im Autostart der
 Brume und ersetzt den PC (v2.x) bzw. das RP2350-Board (v3.x):
@@ -42,15 +42,15 @@ Kommt im Browser trotzdem kein Video an, wechselt das Dashboard automatisch auf
 
 ## Installation
 
-1. Die Datei `klingel-dashboard-brume2_v4.2.4.sh` auf die Brume kopieren,
+1. Die Datei `klingel-dashboard-brume2_v4.3.0.sh` auf die Brume kopieren,
    z. B. mit WinSCP (Protokoll SCP, Benutzer `root`) nach `/root/` oder per
    ```
-   scp -O klingel-dashboard-brume2_v4.2.4.sh root@<IP-der-Brume>:/root/
+   scp -O klingel-dashboard-brume2_v4.3.0.sh root@<IP-der-Brume>:/root/
    ```
 2. Per SSH auf der Brume anmelden und starten:
    ```
    ssh root@<IP-der-Brume>
-   sh /root/klingel-dashboard-brume2_v4.2.4.sh
+   sh /root/klingel-dashboard-brume2_v4.3.0.sh
    ```
 3. Der Installer
    * installiert bei Bedarf **python3** (`opkg`),
@@ -153,6 +153,23 @@ Die vollständige ffmpeg-Ausgabe zeigt der Knopf **Kamera mit diesen Werten test
 
 ---
 
+## Außentemperatur
+
+Oben rechts im Dashboard steht die aktuelle Außentemperatur mit Wettersymbol und Ort.
+Die Daten kommen von **open-meteo.com** (kostenlos, ohne Anmeldung oder API-Schlüssel),
+die Brume fragt sie alle 10 Minuten ab – die iPads selbst brauchen kein Internet.
+
+Einrichtung (Port 8083 → Karte „Außentemperatur“):
+
+* **Ort:** Ortsname oder Postleitzahl, z. B. `Hamburg`, `20095` oder `Musterstadt, DE`
+  (mit Ländercode, wenn es den Namen mehrfach gibt)
+* oder **Breiten- und Längengrad** (genauer, z. B. aus Google Maps: Rechtsklick auf den Ort)
+* **Ort und Temperatur prüfen** zeigt sofort, welcher Ort gefunden wurde und die Temperatur.
+
+Beim Antippen bzw. Darüberfahren zeigt die Anzeige zusätzlich Wetterlage, gefühlte
+Temperatur und Tagesminimum/-maximum. Ist das Internet weg, bleibt der letzte Wert stehen
+und wird nach drei Intervallen grau dargestellt.
+
 ## Dauerbetrieb auf den beiden iPads (6. Generation)
 
 Die Seiten sind für den Dauerbetrieb auf einem iPad im Querformat (1024×768) ausgelegt.
@@ -209,6 +226,12 @@ ist. Für Ton bei gesperrtem iPad: Lautlos-Schalter aus, Seite im Vordergrund la
 ---
 
 ## Versionsverlauf
+
+* **v4.3.0** – aktuelle Außentemperatur
+  * Temperatur, Wettersymbol und Ort in der Kopfzeile beider Dashboards
+  * Daten von Open-Meteo (ohne API-Schlüssel), Abruf durch die Brume alle 10 min
+  * Ort per Name/Postleitzahl (automatische Suche) oder Koordinaten, Test-Knopf
+  * Abruf über Python-HTTPS, ersatzweise curl/wget; Installer ergänzt python3-openssl
 
 * **v4.2.4** – Klingelton als AAC/MP3
   * Safari lehnte den WAV-Ton ab (Code 4) und Web Audio fehlte – typisch für den

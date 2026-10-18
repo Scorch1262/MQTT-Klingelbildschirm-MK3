@@ -1,6 +1,6 @@
 #!/bin/sh
 # ════════════════════════════════════════════════════════════════════
-#  Klingel-Dashboard Brume 2 – Installer v4.2.4
+#  Klingel-Dashboard Brume 2 – Installer v4.3.0
 #  für GL.iNet Brume 2 (GL-MT2500, OpenWrt / GL-Firmware 4.x)
 #
 #  Alles liegt danach in EINEM Ordner:  /root/Klingel-Dashboard
@@ -13,7 +13,7 @@
 #  Mehrfach ausführbar (Update). Eine vorhandene config.ini bleibt erhalten.
 # ════════════════════════════════════════════════════════════════════
 
-VERSION="4.2.4"
+VERSION="4.3.0"
 APP_DIR=${KLINGEL_APP_DIR:-/root/Klingel-Dashboard}
 INIT=${KLINGEL_INIT:-/etc/init.d/klingel-dashboard}
 OLD_DIR=/root/Klingel-Dashboard-Brume2          # Ordnername von v4.0.0
@@ -105,6 +105,16 @@ else
 	python3 -c "import http.server, urllib.request, json, select, socketserver" 2>/dev/null \
 		|| die "python3 konnte nicht installiert werden"
 	ok "$(python3 --version 2>&1)"
+fi
+
+# HTTPS für die Außentemperatur (open-meteo.com): SSL-Modul und Zertifikate
+if python3 -c "import ssl" 2>/dev/null && [ -s /etc/ssl/certs/ca-certificates.crt ]; then
+	ok "HTTPS für Python vorhanden"
+elif command -v opkg >/dev/null; then
+	echo "    installiere HTTPS-Unterstützung (python3-openssl, ca-bundle) ..."
+	opkg_need python3-openssl ca-bundle ca-certificates
+	if python3 -c "import ssl" 2>/dev/null; then ok "HTTPS für Python installiert"
+	else warn "Python ohne SSL – Außentemperatur wird über curl/wget geholt"; fi
 fi
 
 DL=""

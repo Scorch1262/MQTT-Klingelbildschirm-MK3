@@ -187,6 +187,7 @@ function build() {
   var a = '', b = '';
   a += simpleSection('mqtt', 'MQTT-Broker', { broker: 'w75', port: 'w25', benutzer: 'w50', passwort: 'w50', client_id: 'w100' });
   a += simpleSection('oeffner', 'Türöffner – beide Dashboards senden diesen Befehl', { topic_druecken: 'w50', payload_druecken: 'w50', topic_loslassen: 'w50', payload_loslassen: 'w50' });
+  a += wxCard();
   a += simpleSection('allgemein', 'Allgemein', { einrichtung_port: 'w50', admin_passwort: 'w50' });
   b += camCard();
   for (var n = 1; n <= NUM_SITES; n++) b += siteCard(n);
@@ -217,6 +218,12 @@ function collect() {
 }
 
 /* ── Status ── */
+function wxStatus(w) {
+  if (!w || !w.aktiv) return '<span class="dim">aus</span>';
+  if (!w.ok && (w.temp === null || w.temp === undefined)) return '<span class="bad">' + esc(w.msg || 'nicht verfügbar') + '</span>';
+  return '<span class="' + (w.veraltet ? 'dim' : 'ok') + '">' + esc(w.ort || '') + ': ' + String(w.temp).replace('.', ',') + ' °C, ' + esc(w.text || '') +
+    '</span> <span class="dim">· Stand vor ' + (w.alter_min || 0) + ' min' + (w.ok ? '' : ' · letzter Abruf fehlgeschlagen: ' + esc(w.msg)) + '</span>';
+}
 var STATE_TXT = { laeuft: 'läuft', verbinde: 'verbinde', fehler: 'FEHLER', ruht: 'ruht (kein Zuschauer)', aus: 'aus' };
 function fmtUp(s) { var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return 'Laufzeit ' + (d ? d + 'd ' : '') + h + 'h ' + m + 'm'; }
 function loadStatus() {
@@ -240,6 +247,7 @@ function loadStatus() {
       '<b>Dashboards</b><span>' + links.join('<br>') + '</span><br>' +
       '<b>MQTT</b><span class="' + (st.mqtt ? 'ok' : 'bad') + '">' + esc(st.mqtt_state) + '</span><br>' +
       '<b>ffmpeg</b><span>' + ffTxt + '</span><br>' +
+      '<b>Außentemperatur</b><span>' + wxStatus(st.wetter) + '</span><br>' +
       '<b>Konfiguration</b><span>' + esc(st.config) + '</span>';
     var c = 1, cs = st.cam;
     if (cs) {
@@ -276,6 +284,23 @@ function testCam(n) {
     }
     if (d && d.log) { $('tlog' + n).style.display = 'block'; $('tlog' + n).innerHTML = esc(d.log); }
   }, function (e) { $('tcs' + n).innerHTML = '<span class="bad">' + esc(e) + '</span>'; }, 30000);
+}
+function wxCard() {
+  var s = 'wetter', h = '<div class="row">' + input(F(s, 'aktiv'), 'w100') + '</div>';
+  h += '<div class="row">' + input(F(s, 'ort'), 'w100') + '</div>';
+  h += '<div class="row">' + input(F(s, 'breite'), 'w50') + input(F(s, 'laenge'), 'w50') + '</div>';
+  h += '<div class="row">' + input(F(s, 'intervall_min'), 'w50') + '</div>';
+  h += '<button class="btn" type="button" onclick="testWx()">Ort und Temperatur prüfen</button> <span class="mono dim" id="wxRes" style="font-size:11px"></span>';
+  return card('Außentemperatur – beide Dashboards', h);
+}
+function testWx() {
+  var v = collect(), out = { 'wetter.ort': v['wetter.ort'], 'wetter.breite': v['wetter.breite'], 'wetter.laenge': v['wetter.laenge'] };
+  $('wxRes').innerHTML = 'frage open-meteo.com …';
+  req('POST', '/api/test_wetter', { values: out }, function (d) {
+    if (d && d.ok) $('wxRes').innerHTML = '<span class="ok">' + esc(d.ort) + ': ' + String(d.temp).replace('.', ',') + ' °C, ' + esc(d.text) +
+      '</span> <span class="dim">(' + d.lat + ', ' + d.lon + ')</span>';
+    else $('wxRes').innerHTML = '<span class="bad">' + esc((d && d.error) || 'Fehler') + '</span>';
+  }, function (e) { $('wxRes').innerHTML = '<span class="bad">' + esc(e) + '</span>'; }, 40000);
 }
 function testBell(n, b) {
   req('POST', '/api/test_bell', { site: n, bell: b }, function () { setMsg('Testklingeln an Dashboard ' + n + ' / Klingel ' + b, 'ok'); },

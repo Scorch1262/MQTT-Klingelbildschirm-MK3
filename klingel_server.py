@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Klingel-Dashboard Brume 2  –  v4.2.4
+Klingel-Dashboard Brume 2  –  v4.3.0
 ====================================
 
 Laeuft auf einem GL.iNet Brume 2 (GL-MT2500, OpenWrt) im Autostart und stellt bereit:
@@ -10,6 +10,7 @@ Laeuft auf einem GL.iNet Brume 2 (GL-MT2500, OpenWrt) im Autostart und stellt be
       - dasselbe Kamerabild auf beiden (ein RTSP-Stream -> ffmpeg -> MJPEG, auch iOS 9)
       - Türöffner-Taste: beide Dashboards senden denselben MQTT-Befehl an denselben Broker
       - je Dashboard ein eigenes Klingel-Topic, Klingelton im Browser
+      - aktuelle Außentemperatur (Open-Meteo, ohne API-Schlüssel)
   * Einrichtungsseite (Standard-Port 8083): Broker, Topics, Kameras, Ports, Kameratest
 
 Nur Python-Standardbibliothek (Python >= 3.7), dazu ffmpeg mit H.264-Decoder.
@@ -37,7 +38,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
 APP_NAME = "Klingel-Dashboard Brume 2"
-APP_VERSION = "4.2.4"
+APP_VERSION = "4.3.0"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get("KLINGEL_CONFIG") or os.path.join(BASE_DIR, "config.ini")
@@ -107,6 +108,17 @@ def build_schema():
         _f("oeffner", "wiederholung_ms", "int", 500, "Wiederholung solange gedrückt (ms)",
            "der Drücken-Befehl wird in diesem Abstand wiederholt", min=100, max=5000),
     ]
+    # Außentemperatur aus dem Internet (Open-Meteo, ohne API-Schlüssel)
+    s += [
+        _f("wetter", "aktiv", "bool", True, "Außentemperatur anzeigen",
+           "Daten von open-meteo.com, die Brume braucht dafür Internet"),
+        _f("wetter", "ort", "str", "", "Ort",
+           "Ortsname oder Postleitzahl, z. B. \"Hamburg\", \"20095\" oder \"Musterstadt, DE\""),
+        _f("wetter", "breite", "str", "", "Breitengrad (optional)",
+           "z. B. 53.55 – zusammen mit dem Längengrad genauer als der Ortsname"),
+        _f("wetter", "laenge", "str", "", "Längengrad (optional)", "z. B. 9.99"),
+        _f("wetter", "intervall_min", "int", 10, "Aktualisieren alle (Minuten)", min=5, max=120),
+    ]
     # Eine Kamera (ein RTSP-Stream) für beide Dashboards
     sec = "kamera"
     s += [
@@ -156,6 +168,7 @@ SECTION_TITLES = {
     "mqtt": "MQTT-Broker",
     "oeffner": "Türöffner (beide Dashboards)",
     "kamera": "Kamera (beide Dashboards)",
+    "wetter": "Außentemperatur",
 }
 for _n in range(1, NUM_SITES + 1):
     SECTION_TITLES["dashboard%d" % _n] = "Dashboard %d" % _n
@@ -240,7 +253,7 @@ def load_config():
     if raw is None:
         save_config(cfg)
         log("CFG", "config.ini neu angelegt: %s" % CONFIG_PATH)
-    elif migrated or any(k not in cfg for k in raw):
+    elif migrated or any(k not in cfg for k in raw) or any(fid(f) not in raw for f in SCHEMA):
         # veraltete Eintraege (z. B. klingel2/klingel3 aus v4.1) entfernen
         save_config(cfg)
         log("CFG", "Kamera-Einstellungen von Dashboard 1 als gemeinsame Kamera übernommen" if migrated
@@ -996,6 +1009,166 @@ CAMERA = None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+#   Außentemperatur (Open-Meteo)
+# ═══════════════════════════════════════════════════════════════════════════
+
+WEATHER_API = os.environ.get("KLINGEL_WETTER_API", "https://api.open-meteo.com/v1/forecast")
+GEOCODE_API = os.environ.get("KLINGEL_GEO_API", "https://geocoding-api.open-meteo.com/v1/search")
+WEATHER_LOCK = threading.Lock()
+WEATHER = {"ok": False, "msg": "noch nicht abgerufen", "temp": None}
+
+# WMO-Wettercodes -> (Text, Symbol-Kennung)
+WMO = {
+    0: ("klar", "sonne"), 1: ("überwiegend klar", "sonne"), 2: ("teils bewölkt", "wolke-sonne"),
+    3: ("bedeckt", "wolke"), 45: ("Nebel", "nebel"), 48: ("Reifnebel", "nebel"),
+    51: ("leichter Niesel", "regen"), 53: ("Niesel", "regen"), 55: ("starker Niesel", "regen"),
+    56: ("gefrierender Niesel", "regen"), 57: ("gefrierender Niesel", "regen"),
+    61: ("leichter Regen", "regen"), 63: ("Regen", "regen"), 65: ("starker Regen", "regen"),
+    66: ("gefrierender Regen", "regen"), 67: ("gefrierender Regen", "regen"),
+    71: ("leichter Schnee", "schnee"), 73: ("Schnee", "schnee"), 75: ("starker Schnee", "schnee"),
+    77: ("Schneegriesel", "schnee"), 80: ("Regenschauer", "regen"), 81: ("Regenschauer", "regen"),
+    82: ("heftige Schauer", "regen"), 85: ("Schneeschauer", "schnee"), 86: ("Schneeschauer", "schnee"),
+    95: ("Gewitter", "gewitter"), 96: ("Gewitter mit Hagel", "gewitter"), 99: ("Gewitter mit Hagel", "gewitter"),
+}
+
+
+def http_get_json(url, timeout=15):
+    """JSON aus dem Internet holen. Reihenfolge: Python (HTTPS) -> curl -> wget -> HTTP.
+    Auf OpenWrt fehlt manchmal das SSL-Modul von Python oder das Zertifikatspaket."""
+    errors = []
+    hdr = {"User-Agent": "KlingelDashboard/" + APP_VERSION, "Accept": "application/json"}
+    try:
+        req = urllib.request.Request(url, headers=hdr)
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read(2 * 1024 * 1024).decode("utf-8"))
+    except Exception as e:  # noqa
+        errors.append("python: %s" % (getattr(e, "reason", None) or e))
+    for tool, args in (("curl", ["-fsS", "--max-time", str(timeout), "-H", "Accept: application/json"]),
+                       ("wget", ["-q", "-T", str(timeout), "-O", "-"])):
+        exe = shutil.which(tool)
+        if not exe:
+            continue
+        try:
+            r = subprocess.run([exe] + args + [url], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               timeout=timeout + 5)
+            if r.returncode == 0 and r.stdout:
+                return json.loads(r.stdout.decode("utf-8"))
+            errors.append("%s: %s" % (tool, r.stderr.decode("utf-8", "replace").strip()[:120] or r.returncode))
+        except Exception as e:  # noqa
+            errors.append("%s: %s" % (tool, e))
+    if url.startswith("https://"):
+        try:
+            req = urllib.request.Request("http://" + url[8:], headers=hdr)
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return json.loads(r.read(2 * 1024 * 1024).decode("utf-8"))
+        except Exception as e:  # noqa
+            errors.append("http: %s" % (getattr(e, "reason", None) or e))
+    raise OSError("; ".join(errors) or "kein Abruf möglich")
+
+
+def resolve_location(ort, breite, laenge):
+    """-> (lat, lon, anzeigename)"""
+    if breite.strip() and laenge.strip():
+        lat, lon = float(breite.replace(",", ".")), float(laenge.replace(",", "."))
+        return lat, lon, ort.strip() or ("%.2f, %.2f" % (lat, lon))
+    name = ort.strip()
+    if not name:
+        raise ValueError("kein Ort eingetragen")
+    land = ""
+    m = re.match(r"^(.*?)[,\s]+([A-Za-z]{2})$", name)
+    if m and "," in name:
+        name, land = m.group(1).strip(), m.group(2).upper()
+    q = {"name": name, "count": 10, "language": "de", "format": "json"}
+    d = http_get_json(GEOCODE_API + "?" + urllib.parse.urlencode(q))
+    res = d.get("results") or []
+    if land:
+        res = [r for r in res if (r.get("country_code") or "").upper() == land] or res
+    if not res:
+        raise ValueError("Ort \"%s\" nicht gefunden" % ort.strip())
+    r = res[0]
+    label = r.get("name", name)
+    if r.get("admin1") and r.get("admin1") != label:
+        label += ", " + r["admin1"]
+    return float(r["latitude"]), float(r["longitude"]), label
+
+
+def fetch_weather(lat, lon):
+    q = {"latitude": "%.4f" % lat, "longitude": "%.4f" % lon, "timezone": "auto",
+         "current": "temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,is_day,wind_speed_10m",
+         "daily": "temperature_2m_max,temperature_2m_min", "forecast_days": 1}
+    d = http_get_json(WEATHER_API + "?" + urllib.parse.urlencode(q))
+    c = d.get("current") or {}
+    if c.get("temperature_2m") is None:
+        raise ValueError("Antwort ohne Temperatur")
+    code = int(c.get("weather_code") or 0)
+    txt, icon = WMO.get(code, ("", "wolke"))
+    if icon == "sonne" and not c.get("is_day", 1):
+        icon = "mond"
+    if icon == "wolke-sonne" and not c.get("is_day", 1):
+        icon = "wolke-mond"
+    daily = d.get("daily") or {}
+
+    def first(k):
+        v = daily.get(k) or []
+        return v[0] if v else None
+    return {"temp": c.get("temperature_2m"), "gefuehlt": c.get("apparent_temperature"),
+            "feuchte": c.get("relative_humidity_2m"), "wind": c.get("wind_speed_10m"),
+            "code": code, "text": txt, "icon": icon, "max": first("temperature_2m_max"),
+            "min": first("temperature_2m_min"), "zeit": c.get("time", "")}
+
+
+def weather_public():
+    with WEATHER_LOCK:
+        w = dict(WEATHER)
+    if not CFG["wetter.aktiv"]:
+        return {"aktiv": False}
+    w["aktiv"] = True
+    w["alter_min"] = int((time.time() - w["stand"]) / 60) if w.get("stand") else None
+    # älter als 3 Intervalle -> als veraltet kennzeichnen
+    w["veraltet"] = w.get("stand") is None or (time.time() - w["stand"]) > 3 * 60 * CFG["wetter.intervall_min"]
+    return w
+
+
+class WeatherThread(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self, daemon=True, name="wetter")
+        self.loc = None
+        self.loc_key = None
+
+    def run(self):
+        time.sleep(3)
+        while True:
+            wait = 60 * CFG["wetter.intervall_min"]
+            if CFG["wetter.aktiv"]:
+                try:
+                    self.update()
+                except Exception as e:  # noqa
+                    msg = str(e)[:200]
+                    with WEATHER_LOCK:
+                        WEATHER["ok"] = False
+                        WEATHER["msg"] = msg
+                    log("WETTER", "Fehler: %s" % msg)
+                    wait = min(wait, 120)      # bei Fehler bald erneut
+            time.sleep(wait)
+
+    def update(self):
+        key = (CFG["wetter.ort"], CFG["wetter.breite"], CFG["wetter.laenge"])
+        if self.loc is None or self.loc_key != key:
+            self.loc = resolve_location(*key)
+            self.loc_key = key
+            log("WETTER", "Ort: %s (%.4f, %.4f)" % (self.loc[2], self.loc[0], self.loc[1]))
+        lat, lon, name = self.loc
+        w = fetch_weather(lat, lon)
+        with WEATHER_LOCK:
+            first = WEATHER.get("stand") is None
+            WEATHER.clear()
+            WEATHER.update(w)
+            WEATHER.update({"ok": True, "msg": "", "ort": name, "stand": time.time()})
+        if first:
+            log("WETTER", "%s: %.1f °C, %s" % (name, w["temp"], w["text"]))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 #   Netzwerk-Infos, Firewall
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -1305,7 +1478,7 @@ class Handler(BaseHTTPRequestHandler):
             if q.get("view") == "1":
                 cam.demand()
             return self._json({"mqtt": bool(MQTT and MQTT.connected), "bells": bells_state(n), "cam": st,
-                               "t": round(time.time(), 2)})
+                               "wetter": weather_public(), "t": round(time.time(), 2)})
         if p in ("/api/press", "/api/release", "/mqtt/press", "/mqtt/release"):
             return self._site_post(n)
         if p == "/favicon.ico":
@@ -1391,6 +1564,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True, "image": base64.b64encode(jpg).decode(), "w": w, "h": h,
                                    "log": logtxt})
             return self._json({"ok": False, "error": msg, "log": logtxt})
+        if p == "/api/test_wetter":
+            v = data.get("values") or {}
+            try:
+                lat, lon, name = resolve_location(str(v.get("wetter.ort", "")), str(v.get("wetter.breite", "")),
+                                                  str(v.get("wetter.laenge", "")))
+                w = fetch_weather(lat, lon)
+                return self._json({"ok": True, "ort": name, "lat": round(lat, 4), "lon": round(lon, 4),
+                                   "temp": w["temp"], "text": w["text"]})
+            except Exception as e:  # noqa
+                return self._json({"ok": False, "error": str(e)[:300]})
         if p == "/api/test_bell":
             n, b = int(data.get("site") or 0), int(data.get("bell") or 0)
             if 1 <= n <= NUM_SITES and 1 <= b <= NUM_BELLS:
@@ -1516,6 +1699,16 @@ def validate_settings(data):
             errors.append("Port %d wird schon von einem anderen Programm benutzt" % p)
     if not new["oeffner.topic_druecken"]:
         errors.append("Topic beim Drücken darf nicht leer sein")
+    la, lo = new["wetter.breite"].strip(), new["wetter.laenge"].strip()
+    if la or lo:
+        try:
+            fla, flo = float(la.replace(",", ".")), float(lo.replace(",", "."))
+            if not (-90 <= fla <= 90 and -180 <= flo <= 180):
+                raise ValueError
+        except ValueError:
+            errors.append("Außentemperatur: Breiten- und Längengrad als Zahl angeben (z. B. 53.55 / 9.99) oder beide leer lassen")
+    if new["wetter.aktiv"] and not (la and lo) and not new["wetter.ort"].strip():
+        errors.append("Außentemperatur: Ort oder Koordinaten eintragen (oder Anzeige ausschalten)")
     u = new["kamera.kamera_url"].strip().lower()
     if new["kamera.kamera_typ"] == "jpeg" and u and not u.startswith(("http://", "https://")):
         errors.append("Kamera: Standbild-URL muss mit http:// beginnen")
@@ -1528,6 +1721,7 @@ def system_status():
         "mqtt": bool(MQTT and MQTT.connected), "mqtt_state": MQTT.state if MQTT else "-",
         "ffmpeg": FFMPEG, "ips": local_ips(), "ports": all_ports(),
         "cam": CAMERA.status(),
+        "wetter": weather_public(),
         "titles": {str(n): CFG["dashboard%d.titel" % n] for n in range(1, NUM_SITES + 1)},
         "python": sys.version.split()[0], "config": CONFIG_PATH,
     }
@@ -1588,6 +1782,7 @@ def main():
     DOORBELL_WAV = make_doorbell_wav()
     threading.Thread(target=encode_doorbell, daemon=True).start()
 
+    WeatherThread().start()
     CAMERA = Camera()
     CAMERA.start()
 

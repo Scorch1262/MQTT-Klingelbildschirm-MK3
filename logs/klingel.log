@@ -135,3 +135,48 @@
 2026-10-17 [13:50:41] [IPAD1] 127.0.0.1: AUDIO WebAudio aktiv
 2026-10-17 [13:50:43] [MQTT] <- doorbell/bell1: RING
 2026-10-17 [13:50:43] [KLINGEL] Dashboard 1 / Klingel 1 (MQTT doorbell/bell1)
+2026-10-17 [13:51:07] [SYS] Beende (Signal 15)
+2026-10-18 [05:54:03] [CFG] config.ini auf aktuelle Version gebracht
+2026-10-18 [05:54:03] [SYS] Klingel-Dashboard Brume 2 v4.3.0 startet (Python 3.13.16)
+2026-10-18 [05:54:03] [SYS] Konfiguration: /tmp/claude-0/-home-claude/7bfa212c-0761-5693-952c-5c2653311de0/scratchpad/run/config.ini
+2026-10-18 [05:54:03] [FFMPEG] /usr/bin/ffmpeg (Version 6.1.1-3ubuntu5, H.264: ja, H.265: ja)
+2026-10-18 [05:54:03] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
+2026-10-18 [05:54:03] [SYS] ==========================================================
+2026-10-18 [05:54:03] [SYS] Dashboard 1:  http://192.0.2.2:8081   (Haustür)
+2026-10-18 [05:54:03] [SYS] Dashboard 2:  http://192.0.2.2:8082   (Garage)
+2026-10-18 [05:54:03] [SYS] Einrichtung:  http://192.0.2.2:8083
+2026-10-18 [05:54:03] [SYS] ==========================================================
+2026-10-18 [05:54:04] [TON] Klingelton bereit: wav, m4a, mp3
+2026-10-18 [05:54:06] [WETTER] Fehler: kein Ort eingetragen
+2026-10-18 [05:54:08] [CFG] Einstellungen gespeichert - Neustart
+2026-10-18 [05:54:09] [SYS] Neustart ...
+2026-10-18 [05:54:09] [SYS] Klingel-Dashboard Brume 2 v4.3.0 startet (Python 3.13.16)
+2026-10-18 [05:54:09] [SYS] Konfiguration: /tmp/claude-0/-home-claude/7bfa212c-0761-5693-952c-5c2653311de0/scratchpad/run/config.ini
+2026-10-18 [05:54:09] [FFMPEG] /usr/bin/ffmpeg (Version 6.1.1-3ubuntu5, H.264: ja, H.265: ja)
+2026-10-18 [05:54:09] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
+2026-10-18 [05:54:09] [SYS] ==========================================================
+2026-10-18 [05:54:09] [SYS] Dashboard 1:  http://192.0.2.2:8081   (Haustür)
+2026-10-18 [05:54:09] [SYS] Dashboard 2:  http://192.0.2.2:8082   (Garage)
+2026-10-18 [05:54:09] [SYS] Einrichtung:  http://192.0.2.2:8083
+2026-10-18 [05:54:09] [SYS] ==========================================================
+2026-10-18 [05:54:10] [TON] Klingelton bereit: wav, m4a, mp3
+2026-10-18 [05:54:12] [WETTER] Ort: Musterstadt, Nordrhein-Westfalen (51.5000, 7.4700)
+2026-10-18 [05:54:12] [WETTER] Musterstadt, Nordrhein-Westfalen: 12.4 °C, teils bewölkt
+2026-10-18 [05:54:58] [SYS] Beende (Signal 15)
+2026-10-18 [05:54:59] [SYS] Klingel-Dashboard Brume 2 v4.3.0 startet (Python 3.13.16)
+2026-10-18 [05:54:59] [SYS] Konfiguration: /tmp/claude-0/-home-claude/7bfa212c-0761-5693-952c-5c2653311de0/scratchpad/run/config.ini
+2026-10-18 [05:54:59] [FFMPEG] /usr/bin/ffmpeg (Version 6.1.1-3ubuntu5, H.264: ja, H.265: ja)
+2026-10-18 [05:54:59] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
+2026-10-18 [05:54:59] [SYS] ==========================================================
+2026-10-18 [05:54:59] [SYS] Dashboard 1:  http://192.0.2.2:8081   (Haustür)
+2026-10-18 [05:54:59] [SYS] Dashboard 2:  http://192.0.2.2:8082   (Garage)
+2026-10-18 [05:54:59] [SYS] Einrichtung:  http://192.0.2.2:8083
+2026-10-18 [05:54:59] [SYS] ==========================================================
+2026-10-18 [05:54:59] [TON] Klingelton bereit: wav, m4a, mp3
+2026-10-18 [05:55:02] [WETTER] Ort: Musterstadt, Nordrhein-Westfalen (51.5000, 7.4700)
+2026-10-18 [05:55:02] [WETTER] Musterstadt, Nordrhein-Westfalen: 12.4 °C, teils bewölkt
+2026-10-18 [05:55:06] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1
+2026-10-18 [05:55:08] [IPAD1] 127.0.0.1: AUDIO Diagnose: WebAudio vorhanden, AAC "", MP3 "probably", WAV "maybe" | Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36
+2026-10-18 [05:55:10] [KAMERA] Bild empfangen (960x540)
+2026-10-18 [05:55:14] [IPAD1] 127.0.0.1: AUDIO Datei-Ton freigegeben (/klingel.mp3)
+2026-10-18 [05:55:15] [IPAD1] 127.0.0.1: AUDIO WebAudio aktiv
