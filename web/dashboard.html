@@ -405,12 +405,12 @@ function unlockAudio() {
 /* nur echte Gesten (touchstart zählt auf dem iPad nicht als Freigabe) */
 var unlockEvents = ['touchend', 'click', 'mouseup', 'keydown', 'pointerup'];
 for (var ue = 0; ue < unlockEvents.length; ue++) document.addEventListener(unlockEvents[ue], unlockAudio, true);
-/* großer Knopf im Bild: freigeben und zur Bestätigung einmal klingeln */
+/* großer Knopf im Bild: nur freigeben (kein Probeklingeln) */
 function bannerTap(e) {
   if (e && e.preventDefault) e.preventDefault();
   lastUnlock = 0;
   htmlUnlock(); webUnlock();
-  setTimeout(function () { audioUi(); if (audioOk()) { addLog('AUDIO: Testklingeln'); playDoorbell(); } }, 900);
+  setTimeout(audioUi, 900);
 }
 $('audioBanner').addEventListener('touchend', bannerTap, false);
 $('audioBanner').addEventListener('click', bannerTap, false);
@@ -443,20 +443,92 @@ function webDoorbell() {
   }
   tone(1047, 0.00, 0.8); tone(784, 0.45, 0.75); tone(1047, 2.2, 0.7); tone(784, 2.65, 0.7);
 }
-function playDoorbell() {
-  if (htmlOk && bellEl) {
+/* Klingelton abspielen UND kontrollieren, ob er wirklich läuft.
+   Läuft er nach 1,5 s nicht, wird die Tondatei neu geladen und noch einmal gestartet,
+   danach Web Audio als Ersatz. Das Ergebnis jedes Klingelns steht im Brume-Protokoll. */
+var ringSeq = 0, bellBusy = false;
+function htmlPlaying() { return bellEl && !bellEl.paused && bellEl.currentTime > 0.05; }
+function playDoorbell(why) {
+  var seq = ++ringSeq;
+  why = why || 'Klingel';
+  if (!(htmlOk && bellEl)) {
+    if (webOk()) { webDoorbell(); dlog(why + ': Ton über WebAudio', true); return; }
+    dlog(why + ': KEIN TON – Audio gesperrt, bitte antippen');
+    htmlOk = false; audioUi();
+    return;
+  }
+  bellBusy = true;
+  var attempt = 0;
+  function start() {
+    attempt++;
     try {
       bellEl.currentTime = 0;
       var p = bellEl.play();
-      if (p && p.then) p.then(null, function () { htmlOk = false; audioUi(); if (webOk()) webDoorbell(); });
-      return;
-    } catch (e) { htmlOk = false; }
+      if (p && p.then) p.then(null, function (e) { fail('play() abgelehnt: ' + (e && e.name)); });
+    } catch (e) { fail('play() Fehler: ' + e.name); return; }
+    setTimeout(check, 1500);
   }
-  if (webOk()) { webDoorbell(); return; }
-  addLog('AUDIO: Ton gesperrt – einmal tippen', 'er');
+  function check() {
+    if (seq !== ringSeq) return;                 /* neueres Klingeln hat übernommen */
+    if (htmlPlaying()) {
+      dlog(why + ': Ton läuft (' + bellSrcs[bellSrcIdx] + (attempt > 1 ? ', 2. Versuch' : '') + ')', true);
+      setTimeout(function () { if (seq === ringSeq) bellBusy = false; }, 5500);
+      return;
+    }
+    if (attempt < 2) {
+      dlog(why + ': Ton startet nicht (Stand ' + bellEl.currentTime.toFixed(2) + ' s, readyState ' + bellEl.readyState + ') – lade neu');
+      try { bellEl.load(); } catch (e) {}
+      setTimeout(start, 300);
+      return;
+    }
+    fail('Ton läuft auch nach Neuladen nicht');
+  }
+  function fail(reason) {
+    if (seq !== ringSeq) return;
+    bellBusy = false;
+    if (webOk()) { webDoorbell(); dlog(why + ': ' + reason + ' – Ersatzton über WebAudio'); return; }
+    htmlOk = false; audioUi();
+    dlog(why + ': KEIN TON – ' + reason + ' (bitte einmal antippen)');
+  }
+  start();
 }
+
+/* Regelmäßige Prüfung (alle 3 min und wenn die Seite wieder sichtbar wird):
+   die Tondatei kurz im stillen Vorlauf (0,4 s) anspielen und sofort anhalten.
+   Klappt das nicht mehr, wird der Punkt rot und der Knopf erscheint. Hält auch die
+   Audio-Sitzung des iPads wach. */
+var hcBusy = false;
+function audioHealthCheck(reason) {
+  if (actx && actx.state !== 'running' && actx.state !== 'closed' && actx.resume) { try { actx.resume(); } catch (e) {} }
+  if (!htmlOk || !bellEl || bellBusy || hcBusy || document.hidden) { audioUi(); return; }
+  hcBusy = true;
+  var t0 = now(), done = false, timer = null;
+  function finish(ok, msg) {
+    if (done) return; done = true; hcBusy = false;
+    if (timer) clearInterval(timer);
+    if (!bellBusy) { try { bellEl.pause(); bellEl.currentTime = 0; } catch (e) {} }
+    if (!ok) { htmlOk = false; dlog('Prüfung (' + reason + '): ' + msg + ' – Ton wieder gesperrt'); }
+    audioUi();
+  }
+  try {
+    bellEl.currentTime = 0;
+    var p = bellEl.play();
+    if (p && p.then) p.then(null, function (e) { finish(false, 'play() abgelehnt: ' + (e && e.name)); });
+  } catch (e) { finish(false, 'play() Fehler: ' + e.name); return; }
+  timer = setInterval(function () {
+    if (bellBusy) { finish(true); return; }        /* echtes Klingeln kam dazwischen */
+    if (bellEl.currentTime > 0.03) finish(true);
+    else if (now() - t0 > 2500) {
+      try { bellEl.load(); } catch (e) {}
+      finish(true);
+      dlog('Prüfung (' + reason + '): Tondatei neu geladen', true);
+    }
+  }, 25);
+}
+setInterval(function () { audioHealthCheck('regelmäßig'); }, 3 * 60 * 1000);
+
 /* Test: auf "AUDIO" tippen spielt den Klingelton */
-$('audioLbl').addEventListener('click', function () { setTimeout(playDoorbell, 300); }, false);
+$('audioLbl').addEventListener('click', function () { setTimeout(function () { playDoorbell('Test'); }, 300); }, false);
 
 /* ═════════════ TÜRÖFFNER ═════════════ */
 var opener = $('opener'), pressed = false, repTimer = null;
@@ -497,7 +569,7 @@ window.addEventListener('blur', onRelease, false);
 /* ═════════════ KLINGELN ═════════════ */
 var BELL_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">' +
   '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
-var bellNames = {}, lastCount = null;
+var bellNames = {}, lastCount = null, lastBoot = null;
 (function buildBells() {
   var row = $('bells');
   if (!CFG.bells || !CFG.bells.length) { $('bellCard').style.display = 'none'; $('openerCard').style.top = '12px'; return; }
@@ -516,7 +588,7 @@ var bellNames = {}, lastCount = null;
 function ringBell(id) {
   var el = $('bell' + id);
   if (el) { delClass(el, 'active'); void el.offsetWidth; addClass(el, 'active'); }
-  playDoorbell();
+  playDoorbell(String(bellNames[id] || 'Klingel'));
   addLog('BELL: ' + String(bellNames[id] || ('B' + id)).toUpperCase() + ' KLINGELT', 'hi');
   if (camMode === 'einzelbild') loadSnapshot();
 }
@@ -646,6 +718,13 @@ function poll() {
     if (online !== true) { online = true; addLog('SYS: Verbindung zur Brume OK'); }
     setClass($('mqttDot'), 'on', !!d.mqtt);
     var bells = d.bells || {};
+    if (d.boot && lastBoot !== null && d.boot !== lastBoot && lastCount !== null) {
+      /* Brume-Dienst wurde neu gestartet: Zähler beginnen dort wieder bei 0 */
+      addLog('SYS: Brume neu gestartet – Klingel-Zähler zurückgesetzt');
+      slog('SYS Brume-Neustart erkannt, Klingel-Zähler zurückgesetzt');
+      for (var z in lastCount) if (lastCount.hasOwnProperty(z)) lastCount[z] = 0;
+    }
+    if (d.boot) lastBoot = d.boot;
     if (lastCount === null) {
       lastCount = {};
       for (var k in bells) if (bells.hasOwnProperty(k)) lastCount[k] = bells[k].n;
@@ -653,6 +732,7 @@ function poll() {
       for (var id in bells) {
         if (!bells.hasOwnProperty(id)) continue;
         var b = bells[id];
+        if (lastCount[id] !== undefined && b.n < lastCount[id]) lastCount[id] = 0;   /* Zähler kleiner -> neu beginnen */
         if (lastCount[id] !== undefined && b.n > lastCount[id]) ringBell(id);
         else if (!b.a) { var el = $('bell' + id); if (el) delClass(el, 'active'); }
         lastCount[id] = b.n;
@@ -676,6 +756,7 @@ document.addEventListener('visibilitychange', function () {
   if (document.hidden) { if (camMode === 'mjpeg') stopStream(); }
   else {
     audioUi();
+    setTimeout(function () { audioHealthCheck('Seite wieder sichtbar'); }, 1000);
     if (camMode === 'mjpeg' && CFG.cam) startMjpeg(); else loadSnapshot();
   }
 }, false);

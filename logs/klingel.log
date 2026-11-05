@@ -180,3 +180,49 @@
 2026-10-18 [05:55:10] [KAMERA] Bild empfangen (960x540)
 2026-10-18 [05:55:14] [IPAD1] 127.0.0.1: AUDIO Datei-Ton freigegeben (/klingel.mp3)
 2026-10-18 [05:55:15] [IPAD1] 127.0.0.1: AUDIO WebAudio aktiv
+2026-10-18 [05:55:52] [SYS] Beende (Signal 15)
+2026-11-04 [05:25:33] [SYS] Klingel-Dashboard Brume 2 v4.3.1 startet (Python 3.13.16)
+2026-11-04 [05:25:33] [SYS] Konfiguration: /tmp/claude-0/-home-claude/7bfa212c-0761-5693-952c-5c2653311de0/scratchpad/run/config.ini
+2026-11-04 [05:25:33] [FFMPEG] /usr/bin/ffmpeg (Version 6.1.1-3ubuntu5, H.264: ja, H.265: ja)
+2026-11-04 [05:25:34] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
+2026-11-04 [05:25:34] [SYS] ==========================================================
+2026-11-04 [05:25:34] [SYS] Dashboard 1:  http://192.0.2.2:8081   (Haustür)
+2026-11-04 [05:25:34] [SYS] Dashboard 2:  http://192.0.2.2:8082   (Garage)
+2026-11-04 [05:25:34] [SYS] Einrichtung:  http://192.0.2.2:8083
+2026-11-04 [05:25:34] [SYS] ==========================================================
+2026-11-04 [05:25:34] [TON] Klingelton bereit: wav, m4a, mp3
+2026-11-04 [05:25:37] [WETTER] Ort: Musterstadt, Nordrhein-Westfalen (51.5000, 7.4700)
+2026-11-04 [05:25:37] [WETTER] Musterstadt, Nordrhein-Westfalen: 12.4 °C, teils bewölkt
+2026-11-04 [05:25:51] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1
+2026-11-04 [05:25:52] [IPAD1] 127.0.0.1: AUDIO Diagnose: WebAudio FEHLT, AAC "", MP3 "probably", WAV "maybe" – vermutlich Blockierungsmodus (Lockdown Mode) aktiv | Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36
+2026-11-04 [05:25:54] [KAMERA] Bild empfangen (960x540)
+2026-11-04 [05:25:59] [IPAD1] 127.0.0.1: AUDIO Datei-Ton freigegeben (/klingel.mp3)
+2026-11-04 [05:26:01] [MQTT] <- doorbell/bell1: RING
+2026-11-04 [05:26:01] [KLINGEL] Dashboard 1 / Klingel 1 (MQTT doorbell/bell1)
+2026-11-04 [05:26:03] [IPAD1] 127.0.0.1: AUDIO Klingel Klingel: Ton läuft (/klingel.mp3)
+2026-11-04 [05:26:09] [CFG] Einstellungen gespeichert - Neustart
+2026-11-04 [05:26:10] [SYS] Neustart ...
+2026-11-04 [05:26:10] [SYS] Klingel-Dashboard Brume 2 v4.3.1 startet (Python 3.13.16)
+2026-11-04 [05:26:10] [SYS] Konfiguration: /tmp/claude-0/-home-claude/7bfa212c-0761-5693-952c-5c2653311de0/scratchpad/run/config.ini
+2026-11-04 [05:26:10] [FFMPEG] /usr/bin/ffmpeg (Version 6.1.1-3ubuntu5, H.264: ja, H.265: ja)
+2026-11-04 [05:26:10] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
+2026-11-04 [05:26:10] [SYS] ==========================================================
+2026-11-04 [05:26:10] [SYS] Dashboard 1:  http://192.0.2.2:8081   (Haustür)
+2026-11-04 [05:26:10] [SYS] Dashboard 2:  http://192.0.2.2:8082   (Garage)
+2026-11-04 [05:26:10] [SYS] Einrichtung:  http://192.0.2.2:8083
+2026-11-04 [05:26:10] [SYS] ==========================================================
+2026-11-04 [05:26:11] [TON] Klingelton bereit: wav, m4a, mp3
+2026-11-04 [05:26:11] [IPAD1] 127.0.0.1: SYS Brume-Neustart erkannt, Klingel-Zähler zurückgesetzt
+2026-11-04 [05:26:11] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1
+2026-11-04 [05:26:13] [WETTER] Ort: Musterstadt, Nordrhein-Westfalen (51.5000, 7.4700)
+2026-11-04 [05:26:13] [WETTER] Musterstadt, Nordrhein-Westfalen: 12.4 °C, teils bewölkt
+2026-11-04 [05:26:14] [KAMERA] Bild empfangen (960x540)
+2026-11-04 [05:26:15] [MQTT] <- doorbell/bell1: RING
+2026-11-04 [05:26:15] [KLINGEL] Dashboard 1 / Klingel 1 (MQTT doorbell/bell1)
+2026-11-04 [05:26:17] [IPAD1] 127.0.0.1: AUDIO Klingel Klingel: Ton läuft (/klingel.mp3)
+2026-11-04 [05:26:22] [MQTT] <- doorbell/bell1: RING
+2026-11-04 [05:26:22] [KLINGEL] Dashboard 1 / Klingel 1 (MQTT doorbell/bell1)
+2026-11-04 [05:26:24] [IPAD1] 127.0.0.1: AUDIO Klingel Klingel: Ton startet nicht (Stand 0.00 s, readyState 4) – lade neu
+2026-11-04 [05:26:26] [IPAD1] 127.0.0.1: AUDIO Klingel Klingel: KEIN TON – Ton läuft auch nach Neuladen nicht (bitte einmal antippen)
+2026-11-04 [05:26:27] [IPAD1] 127.0.0.1: AUDIO Datei-Ton freigegeben (/klingel.mp3)
+2026-11-04 [05:26:29] [IPAD1] 127.0.0.1: AUDIO Prüfung (Test): play() abgelehnt: NotAllowedError – Ton wieder gesperrt

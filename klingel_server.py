@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Klingel-Dashboard Brume 2  –  v4.3.0
+Klingel-Dashboard Brume 2  –  v4.3.1
 ====================================
 
 Laeuft auf einem GL.iNet Brume 2 (GL-MT2500, OpenWrt) im Autostart und stellt bereit:
@@ -38,7 +38,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
 APP_NAME = "Klingel-Dashboard Brume 2"
-APP_VERSION = "4.3.0"
+APP_VERSION = "4.3.1"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get("KLINGEL_CONFIG") or os.path.join(BASE_DIR, "config.ini")
@@ -51,6 +51,7 @@ CAM_LINGER_S = 30.0          # Kamera läuft nach dem letzten Zuschauer noch 30 
 CAM_FIRST_FRAME_S = 20.0     # so lange darf das erste Bild dauern
 CAM_STALL_S = 12.0           # kein neues Bild -> ffmpeg neu starten
 START_TIME = time.time()
+BOOT_ID = "%x" % int(START_TIME * 1000)   # ändert sich bei jedem Start -> Dashboards setzen Klingel-Zähler neu
 
 
 LOG_DIR = os.path.join(BASE_DIR, "logs")
@@ -1478,7 +1479,7 @@ class Handler(BaseHTTPRequestHandler):
             if q.get("view") == "1":
                 cam.demand()
             return self._json({"mqtt": bool(MQTT and MQTT.connected), "bells": bells_state(n), "cam": st,
-                               "wetter": weather_public(), "t": round(time.time(), 2)})
+                               "wetter": weather_public(), "boot": BOOT_ID, "t": round(time.time(), 2)})
         if p in ("/api/press", "/api/release", "/mqtt/press", "/mqtt/release"):
             return self._site_post(n)
         if p == "/favicon.ico":

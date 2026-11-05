@@ -1,4 +1,4 @@
-# Klingel-Dashboard Brume 2 – v4.3.0
+# Klingel-Dashboard Brume 2 – v4.3.1
 
 Klingel-Dashboard für den **GL.iNet Brume 2 (GL-MT2500)**. Es läuft im Autostart der
 Brume und ersetzt den PC (v2.x) bzw. das RP2350-Board (v3.x):
@@ -42,15 +42,15 @@ Kommt im Browser trotzdem kein Video an, wechselt das Dashboard automatisch auf
 
 ## Installation
 
-1. Die Datei `klingel-dashboard-brume2_v4.3.0.sh` auf die Brume kopieren,
+1. Die Datei `klingel-dashboard-brume2_v4.3.1.sh` auf die Brume kopieren,
    z. B. mit WinSCP (Protokoll SCP, Benutzer `root`) nach `/root/` oder per
    ```
-   scp -O klingel-dashboard-brume2_v4.3.0.sh root@<IP-der-Brume>:/root/
+   scp -O klingel-dashboard-brume2_v4.3.1.sh root@<IP-der-Brume>:/root/
    ```
 2. Per SSH auf der Brume anmelden und starten:
    ```
    ssh root@<IP-der-Brume>
-   sh /root/klingel-dashboard-brume2_v4.3.0.sh
+   sh /root/klingel-dashboard-brume2_v4.3.1.sh
    ```
 3. Der Installer
    * installiert bei Bedarf **python3** (`opkg`),
@@ -182,7 +182,12 @@ Die Seiten sind für den Dauerbetrieb auf einem iPad im Querformat (1024×768) a
 4. Nach dem Öffnen **einmal irgendwo auf die Seite tippen**. Safari lässt Ton erst nach
    einer Berührung zu (das lässt sich auf dem iPad nicht abschalten). Solange der Ton
    gesperrt ist, ist der AUDIO-Punkt rot und unten im Bild blinkt der Knopf
-   **„Klingelton einschalten – hier tippen“**. Nach dem Tippen klingelt es einmal zur Probe.
+   **„Klingelton einschalten – hier tippen“**. Ein Probeklingeln gibt es nicht; zum Testen
+   oben auf **AUDIO** tippen.
+   Die Seite prüft alle 3 Minuten, ob der Ton noch freigegeben ist, und kontrolliert bei
+   jedem Klingeln, ob der Ton wirklich läuft. Geht die Freigabe verloren, wird der Punkt
+   rot und der Knopf erscheint wieder. Jedes Klingeln steht mit Ergebnis im Protokoll
+   (`grep -E "KLINGEL|IPAD" /root/Klingel-Dashboard/logs/klingel.log`).
    Klappt die Freigabe nicht, steht der Grund im Ereignis-Log und in
    `/root/Klingel-Dashboard/logs/klingel.log` (Zeilen mit `[IPAD1]`/`[IPAD2]`). Danach bleibt der Ton frei,
    solange die Seite offen ist; die Seite lädt sich dafür nie selbst neu.
@@ -226,6 +231,15 @@ ist. Für Ton bei gesperrtem iPad: Lautlos-Schalter aus, Seite im Vordergrund la
 ---
 
 ## Versionsverlauf
+
+* **v4.3.1** – Klingeln zuverlässiger
+  * Fehler behoben: nach einem Neustart des Brume-Dienstes (z. B. nach „Speichern“)
+    verpassten die iPads Klingeln, weil der Klingel-Zähler wieder bei 0 begann
+  * jedes Klingeln wird kontrolliert: läuft der Ton nach 1,5 s nicht, wird die Tondatei
+    neu geladen und erneut gestartet; klappt das nicht, wird der Punkt rot
+  * Prüfung der Ton-Freigabe alle 3 Minuten und beim Wiedererscheinen der Seite
+  * kein Probeklingeln mehr beim Einschalten des Tons (Test über „AUDIO“)
+  * Ergebnis jedes Klingelns im Brume-Protokoll
 
 * **v4.3.0** – aktuelle Außentemperatur
   * Temperatur, Wettersymbol und Ort in der Kopfzeile beider Dashboards
