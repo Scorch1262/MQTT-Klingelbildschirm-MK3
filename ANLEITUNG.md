@@ -1,4 +1,4 @@
-# Klingel-Dashboard Brume 2 – v4.3.1
+# Klingel-Dashboard Brume 2 – v4.3.2
 
 Klingel-Dashboard für den **GL.iNet Brume 2 (GL-MT2500)**. Es läuft im Autostart der
 Brume und ersetzt den PC (v2.x) bzw. das RP2350-Board (v3.x):
@@ -42,15 +42,15 @@ Kommt im Browser trotzdem kein Video an, wechselt das Dashboard automatisch auf
 
 ## Installation
 
-1. Die Datei `klingel-dashboard-brume2_v4.3.1.sh` auf die Brume kopieren,
+1. Die Datei `klingel-dashboard-brume2_v4.3.2.sh` auf die Brume kopieren,
    z. B. mit WinSCP (Protokoll SCP, Benutzer `root`) nach `/root/` oder per
    ```
-   scp -O klingel-dashboard-brume2_v4.3.1.sh root@<IP-der-Brume>:/root/
+   scp -O klingel-dashboard-brume2_v4.3.2.sh root@<IP-der-Brume>:/root/
    ```
 2. Per SSH auf der Brume anmelden und starten:
    ```
    ssh root@<IP-der-Brume>
-   sh /root/klingel-dashboard-brume2_v4.3.1.sh
+   sh /root/klingel-dashboard-brume2_v4.3.2.sh
    ```
 3. Der Installer
    * installiert bei Bedarf **python3** (`opkg`),
@@ -231,6 +231,16 @@ ist. Für Ton bei gesperrtem iPad: Lautlos-Schalter aus, Seite im Vordergrund la
 ---
 
 ## Versionsverlauf
+
+* **v4.3.2** – nur noch eine Instanz
+  * Fehler behoben: beim Update lief die alte Version weiter (hielt die Ports, iPads zeigten
+    die alte Versionsnummer) und beide Instanzen warfen sich beim MQTT-Broker gegenseitig
+    raus (gleiche Client-ID) – Verbindungsabbrüche alle paar Sekunden
+  * das Programm beendet beim Start alle anderen laufenden Instanzen (auch alte Versionen)
+    und hält eine Sperrdatei; bekommt es seine Ports nicht, beendet es sich ganz
+  * Installer beendet übrig gebliebene Prozesse und prüft danach Version und Instanzzahl
+  * Hinweis im Protokoll, wenn der Broker immer kurz nach der Anmeldung trennt
+    (doppelte Client-ID)
 
 * **v4.3.1** – Klingeln zuverlässiger
   * Fehler behoben: nach einem Neustart des Brume-Dienstes (z. B. nach „Speichern“)

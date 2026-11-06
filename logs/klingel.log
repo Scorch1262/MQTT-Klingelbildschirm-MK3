@@ -226,3 +226,29 @@
 2026-11-04 [05:26:26] [IPAD1] 127.0.0.1: AUDIO Klingel Klingel: KEIN TON – Ton läuft auch nach Neuladen nicht (bitte einmal antippen)
 2026-11-04 [05:26:27] [IPAD1] 127.0.0.1: AUDIO Datei-Ton freigegeben (/klingel.mp3)
 2026-11-04 [05:26:29] [IPAD1] 127.0.0.1: AUDIO Prüfung (Test): play() abgelehnt: NotAllowedError – Ton wieder gesperrt
+2026-11-04 [05:26:49] [SYS] Beende (Signal 15)
+2026-11-06 [20:35:32] [SYS] Klingel-Dashboard Brume 2 v4.3.2 startet (Python 3.13.16)
+2026-11-06 [20:35:32] [SYS] Konfiguration: /tmp/claude-0/-home-claude/7bfa212c-0761-5693-952c-5c2653311de0/scratchpad/run/config.ini
+2026-11-06 [20:35:32] [SYS] beende weitere laufende Instanz (PID 173)
+2026-11-06 [20:35:32] [SYS] beende weitere laufende Instanz (PID 206)
+2026-11-06 [20:35:32] [FFMPEG] /usr/bin/ffmpeg (Version 6.1.1-3ubuntu5, H.264: ja, H.265: ja)
+2026-11-06 [20:35:33] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
+2026-11-06 [20:35:33] [SYS] ==========================================================
+2026-11-06 [20:35:33] [SYS] Dashboard 1:  http://192.0.2.2:8081   (Haustür)
+2026-11-06 [20:35:33] [SYS] Dashboard 2:  http://192.0.2.2:8082   (Garage)
+2026-11-06 [20:35:33] [SYS] Einrichtung:  http://192.0.2.2:8083
+2026-11-06 [20:35:33] [SYS] ==========================================================
+2026-11-06 [20:35:33] [TON] Klingelton bereit: wav, m4a, mp3
+2026-11-06 [20:35:36] [WETTER] Fehler: python: Tunnel connection failed: 403 Forbidden; curl: curl: (22) The requested URL returned error: 403; wget: 4; http: [Errno -2] Name or service not known
+2026-11-06 [20:36:03] [MQTT] getrennt: Verbindung vom Broker geschlossen
+2026-11-06 [20:36:06] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
+2026-11-06 [20:36:07] [MQTT] getrennt: Verbindung vom Broker geschlossen
+2026-11-06 [20:36:10] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
+2026-11-06 [20:36:12] [MQTT] getrennt: Verbindung vom Broker geschlossen
+2026-11-06 [20:36:15] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
+2026-11-06 [20:36:16] [MQTT] HINWEIS: Broker trennt immer kurz nach der Anmeldung. Meist nutzt ein anderes Gerät/Programm dieselbe Client-ID 'klingel-brume2' – in der Einrichtung eine eindeutige Client-ID eintragen.
+2026-11-06 [20:36:16] [MQTT] getrennt: Verbindung vom Broker geschlossen
+2026-11-06 [20:36:19] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
+2026-11-06 [20:36:21] [MQTT] getrennt: Verbindung vom Broker geschlossen
+2026-11-06 [20:36:24] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
+2026-11-06 [20:36:40] [SYS] Beende (Signal 15)

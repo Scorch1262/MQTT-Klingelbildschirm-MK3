@@ -1,6 +1,6 @@
 #!/bin/sh
 # ════════════════════════════════════════════════════════════════════
-#  Klingel-Dashboard Brume 2 – Installer v4.3.1
+#  Klingel-Dashboard Brume 2 – Installer v4.3.2
 #  für GL.iNet Brume 2 (GL-MT2500, OpenWrt / GL-Firmware 4.x)
 #
 #  Alles liegt danach in EINEM Ordner:  /root/Klingel-Dashboard
@@ -13,7 +13,7 @@
 #  Mehrfach ausführbar (Update). Eine vorhandene config.ini bleibt erhalten.
 # ════════════════════════════════════════════════════════════════════
 
-VERSION="4.3.1"
+VERSION="4.3.2"
 APP_DIR=${KLINGEL_APP_DIR:-/root/Klingel-Dashboard}
 INIT=${KLINGEL_INIT:-/etc/init.d/klingel-dashboard}
 OLD_DIR=/root/Klingel-Dashboard-Brume2          # Ordnername von v4.0.0
@@ -208,8 +208,35 @@ fi
 say "Dienst starten"
 "$INIT" stop >/dev/null 2>&1
 sleep 1
+# alle noch laufenden Klingel-Prozesse beenden (auch ältere Versionen,
+# die nicht über den Autostart gestartet wurden)
+running_pids() { ps w 2>/dev/null | grep '[k]lingel_server.py' | awk '{print $1}'; }
+PIDS=$(running_pids)
+if [ -n "$PIDS" ]; then
+	warn "laufende alte Instanz(en) gefunden: $(echo $PIDS) – werden beendet"
+	kill $PIDS 2>/dev/null
+	for i in 1 2 3 4 5 6 7 8; do [ -z "$(running_pids)" ] && break; sleep 1; done
+	PIDS=$(running_pids)
+	[ -n "$PIDS" ] && kill -9 $PIDS 2>/dev/null && sleep 1
+fi
 "$INIT" start
-sleep 4
+
+# prüfen, ob genau eine Instanz läuft und die neue Version antwortet
+P1=$(sed -n '/^\[dashboard1\]/,/^\[/s/^port *= *\([0-9]*\)/\1/p' "$APP_DIR/config.ini" 2>/dev/null)
+[ -n "$P1" ] || P1=8081
+GOT=""
+for i in $(seq 1 20); do
+	sleep 1
+	GOT=$(python3 -c "import json,urllib.request;print(json.load(urllib.request.urlopen('http://127.0.0.1:$P1/api/config',timeout=2))['version'])" 2>/dev/null)
+	[ -n "$GOT" ] && break
+done
+N=$(running_pids | wc -l)
+if [ "$GOT" = "$VERSION" ] && [ "$N" -eq 1 ]; then
+	ok "Dienst läuft: v$GOT, 1 Instanz"
+else
+	warn "Dienst antwortet mit Version '${GOT:-keine Antwort}', laufende Instanzen: $N"
+	warn "Protokoll: tail -30 $APP_DIR/logs/klingel.log"
+fi
 
 PORTS=$(sed -n 's/^port *= *\([0-9]*\)/\1/p' "$APP_DIR/config.ini" 2>/dev/null | tail -n2 | tr '\n' ' ')
 SETUP=$(sed -n 's/^einrichtung_port *= *\([0-9]*\)/\1/p' "$APP_DIR/config.ini" 2>/dev/null)

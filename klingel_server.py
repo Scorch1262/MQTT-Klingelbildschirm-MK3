@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Klingel-Dashboard Brume 2  –  v4.3.1
+Klingel-Dashboard Brume 2  –  v4.3.2
 ====================================
 
 Laeuft auf einem GL.iNet Brume 2 (GL-MT2500, OpenWrt) im Autostart und stellt bereit:
@@ -38,7 +38,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
 APP_NAME = "Klingel-Dashboard Brume 2"
-APP_VERSION = "4.3.1"
+APP_VERSION = "4.3.2"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get("KLINGEL_CONFIG") or os.path.join(BASE_DIR, "config.ini")
@@ -99,7 +99,8 @@ def build_schema():
         _f("mqtt", "port", "port", 1883, "Broker-Port"),
         _f("mqtt", "benutzer", "str", "", "Benutzer", "leer = ohne Anmeldung"),
         _f("mqtt", "passwort", "pass", "", "Passwort"),
-        _f("mqtt", "client_id", "str", "klingel-brume2", "Client-ID"),
+        _f("mqtt", "client_id", "str", "klingel-brume2", "Client-ID",
+           "muss im Netz eindeutig sein – zwei Geräte mit gleicher ID werfen sich gegenseitig raus"),
 
         _f("oeffner", "topic_druecken", "str", "doorbell/opener", "Topic beim Drücken"),
         _f("oeffner", "payload_druecken", "str", "OPEN", "Payload beim Drücken"),
@@ -378,6 +379,8 @@ class MQTTClient(threading.Thread):
         self.last_tx = 0.0
         self.last_rx = 0.0
         self.pkt_id = 1
+        self._t_ok = 0.0
+        self.quick_drops = 0
 
     # -- Hilfen --------------------------------------------------------------
     def _send(self, data):
@@ -425,10 +428,21 @@ class MQTTClient(threading.Thread):
                 self.state = "kein Broker eingetragen"
                 time.sleep(5)
                 continue
+            t_conn = [0.0]
             try:
                 self.state = "verbinde mit %s:%d" % (host, port)
+                self._t_ok = 0.0
                 self._session(host, port)
             except Exception as e:  # noqa
+                t_conn[0] = self._t_ok
+                if t_conn[0] and time.time() - t_conn[0] < 20:
+                    self.quick_drops += 1
+                    if self.quick_drops == 3:
+                        log("MQTT", "HINWEIS: Broker trennt immer kurz nach der Anmeldung. Meist nutzt ein "
+                                    "anderes Gerät/Programm dieselbe Client-ID '%s' – in der Einrichtung "
+                                    "eine eindeutige Client-ID eintragen." % CFG["mqtt.client_id"])
+                elif t_conn[0]:
+                    self.quick_drops = 0
                 msg = str(e) or e.__class__.__name__
                 if isinstance(e, socket.timeout):
                     msg = "Zeitüberschreitung"
@@ -483,6 +497,7 @@ class MQTTClient(threading.Thread):
             self._send(b"\x82" + _mqtt_len(len(sb)) + sb)
         self.connected = True
         self.state = "verbunden mit %s:%d" % (host, port)
+        self._t_ok = time.time()
         self.last_rx = time.time()
         log("MQTT", "%s, abonniert: %s" % (self.state, ", ".join(tops) or "-"))
         s.settimeout(1.0)
@@ -1767,6 +1782,88 @@ def schedule_restart():
     threading.Thread(target=do, daemon=True).start()
 
 
+LOCK_PATH = os.environ.get("KLINGEL_LOCK", "/var/run/klingel-dashboard.lock"
+                           if os.path.isdir("/var/run") and os.access("/var/run", os.W_OK)
+                           else os.path.join(BASE_DIR, "logs", "klingel-dashboard.lock"))
+_LOCK_FH = []
+
+
+def _other_instances():
+    """PIDs anderer laufender klingel_server.py (auch alter Versionen ohne Sperrdatei)."""
+    me = os.getpid()
+    out = []
+    try:
+        pids = [int(d) for d in os.listdir("/proc") if d.isdigit()]
+    except OSError:
+        return out
+    for pid in pids:
+        if pid == me:
+            continue
+        try:
+            with open("/proc/%d/cmdline" % pid, "rb") as fh:
+                args = fh.read().split(b"\0")
+        except OSError:
+            continue
+        if any(a.endswith(b"klingel_server.py") for a in args) and any(b"python" in a for a in args[:2]):
+            out.append(pid)
+    return out
+
+
+def _wait_gone(pid, timeout):
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        if not os.path.exists("/proc/%d" % pid):
+            return True
+        try:
+            with open("/proc/%d/stat" % pid) as fh:
+                if fh.read().split(")")[-1].split()[0] == "Z":   # Zombie = beendet
+                    return True
+        except OSError:
+            return True
+        time.sleep(0.2)
+    return False
+
+
+def ensure_single_instance():
+    """Nur eine Instanz darf laufen: zwei Instanzen werfen sich gegenseitig beim
+    MQTT-Broker raus (gleiche Client-ID) und die alte hält die Ports fest."""
+    others = _other_instances()
+    for pid in others:
+        log("SYS", "beende weitere laufende Instanz (PID %d)" % pid)
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            continue
+    for pid in others:
+        if not _wait_gone(pid, 8):
+            log("SYS", "Instanz PID %d reagiert nicht – wird hart beendet" % pid)
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
+            _wait_gone(pid, 3)
+    try:
+        import fcntl
+        fh = open(LOCK_PATH, "a+")
+        t0 = time.time()
+        while True:
+            try:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if time.time() - t0 > 15:
+                    log("SYS", "FEHLER: Sperrdatei %s bleibt belegt – beende" % LOCK_PATH)
+                    sys.exit(1)
+                time.sleep(0.5)
+        fh.seek(0)
+        fh.truncate()
+        fh.write(str(os.getpid()))
+        fh.flush()
+        _LOCK_FH.append(fh)
+    except ImportError:
+        pass
+
+
 def on_signal(signum, frame):
     log("SYS", "Beende (Signal %d)" % signum)
     shutdown_children()
@@ -1779,6 +1876,27 @@ def main():
     signal.signal(signal.SIGINT, on_signal)
     log("SYS", "%s v%s startet (Python %s)" % (APP_NAME, APP_VERSION, sys.version.split()[0]))
     log("SYS", "Konfiguration: %s" % CONFIG_PATH)
+    ensure_single_instance()
+
+    # Ports zuerst belegen: klappt das nicht, gar nicht erst MQTT/Kamera starten
+    plan = [(CFG["dashboard%d.port" % n], "site", n) for n in range(1, NUM_SITES + 1)]
+    plan.append((CFG["allgemein.einrichtung_port"], "setup", 0))
+    for port, role, n in plan:
+        srv = None
+        for attempt in range(15):
+            try:
+                srv = Server(("0.0.0.0", port), role, n)
+                break
+            except OSError as e:
+                if attempt == 14:
+                    log("HTTP", "FEHLER: Port %d nicht nutzbar (%s) – Programm beendet sich, "
+                                "Autostart versucht es erneut" % (port, e))
+                    for s_ in SERVERS:
+                        s_.server_close()
+                    sys.exit(1)
+                time.sleep(1)
+        SERVERS.append(srv)
+
     find_ffmpeg()
     DOORBELL_WAV = make_doorbell_wav()
     threading.Thread(target=encode_doorbell, daemon=True).start()
@@ -1790,22 +1908,9 @@ def main():
     MQTT = MQTTClient(on_mqtt_message)
     MQTT.start()
 
-    plan = [(CFG["dashboard%d.port" % n], "site", n) for n in range(1, NUM_SITES + 1)]
-    plan.append((CFG["allgemein.einrichtung_port"], "setup", 0))
-    for port, role, n in plan:
-        for attempt in range(10):
-            try:
-                srv = Server(("0.0.0.0", port), role, n)
-                break
-            except OSError as e:
-                if attempt == 9:
-                    log("HTTP", "Port %d nicht nutzbar: %s" % (port, e))
-                    srv = None
-                else:
-                    time.sleep(1)
-        if srv:
-            SERVERS.append(srv)
-            threading.Thread(target=srv.serve_forever, daemon=True, name="http%d" % port).start()
+    for srv in SERVERS:
+        threading.Thread(target=srv.serve_forever, daemon=True,
+                         name="http%d" % srv.server_address[1]).start()
 
     threading.Thread(target=sync_firewall, daemon=True).start()
 

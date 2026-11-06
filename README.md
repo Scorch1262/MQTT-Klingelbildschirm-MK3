@@ -1,6 +1,6 @@
 # Klingel-Dashboard Brume 2
 
-**Version 4.3.1** · Klingel-Dashboard mit Kamerabild und MQTT-Türöffner für den
+**Version 4.3.2** · Klingel-Dashboard mit Kamerabild und MQTT-Türöffner für den
 **GL.iNet Brume 2 (GL-MT2500)**, angezeigt dauerhaft auf zwei iPads.
 
 ![Klingel-Dashboard auf dem iPad: Kamerabild links, Klingel-Monitor, Öffner-Taste und Ereignis-Log rechts](docs/dashboard.png)
@@ -26,10 +26,10 @@ Nur Python-Standardbibliothek – keine zusätzlichen Python-Pakete nötig.
 
 ## Installation
 
-1. `klingel-dashboard-brume2_v4.3.1.sh` per WinSCP oder `scp -O` nach `/root/` auf die Brume kopieren.
+1. `klingel-dashboard-brume2_v4.3.2.sh` per WinSCP oder `scp -O` nach `/root/` auf die Brume kopieren.
 2. Per SSH als `root` ausführen:
    ```
-   sh /root/klingel-dashboard-brume2_v4.3.1.sh
+   sh /root/klingel-dashboard-brume2_v4.3.2.sh
    ```
 3. Einrichtung öffnen: `http://<IP-der-Brume>:8083`
    → Broker, Öffner-Topics, Kamera-URL und Ort für die Außentemperatur eintragen → **Kamera mit diesen Werten testen** → **Speichern & Neustart**.
