@@ -1,4 +1,4 @@
-# Klingel-Dashboard Brume 2 – v4.3.2
+# Klingel-Dashboard Brume 2 – v4.3.3
 
 Klingel-Dashboard für den **GL.iNet Brume 2 (GL-MT2500)**. Es läuft im Autostart der
 Brume und ersetzt den PC (v2.x) bzw. das RP2350-Board (v3.x):
@@ -42,15 +42,15 @@ Kommt im Browser trotzdem kein Video an, wechselt das Dashboard automatisch auf
 
 ## Installation
 
-1. Die Datei `klingel-dashboard-brume2_v4.3.2.sh` auf die Brume kopieren,
+1. Die Datei `klingel-dashboard-brume2_v4.3.3.sh` auf die Brume kopieren,
    z. B. mit WinSCP (Protokoll SCP, Benutzer `root`) nach `/root/` oder per
    ```
-   scp -O klingel-dashboard-brume2_v4.3.2.sh root@<IP-der-Brume>:/root/
+   scp -O klingel-dashboard-brume2_v4.3.3.sh root@<IP-der-Brume>:/root/
    ```
 2. Per SSH auf der Brume anmelden und starten:
    ```
    ssh root@<IP-der-Brume>
-   sh /root/klingel-dashboard-brume2_v4.3.2.sh
+   sh /root/klingel-dashboard-brume2_v4.3.3.sh
    ```
 3. Der Installer
    * installiert bei Bedarf **python3** (`opkg`),
@@ -84,10 +84,12 @@ Programmen (z. B. `Outfit-Dashboard`, `mqtt-dashboard`):
 ├── install.sh  uninstall.sh  ANLEITUNG.md  VERSION
 ```
 
-Außerhalb des Ordners gibt es nur den Verweis `/etc/init.d/klingel-dashboard`
-→ `files/klingel-dashboard.init`. OpenWrt startet Dienste nur von dort, deshalb ist
-er für den Autostart nötig. Die Version 4.0.0 hieß noch `Klingel-Dashboard-Brume2`;
-der Installer übernimmt `config.ini` und ffmpeg daraus und entfernt den alten Ordner.
+Außerhalb des Ordners gibt es nur die Kopie des Autostart-Skripts
+`/etc/init.d/klingel-dashboard` (Vorlage: `files/klingel-dashboard.init`). OpenWrt startet
+Dienste nur von dort. Es muss eine echte Datei sein, kein Verweis – sonst führt OpenWrt den
+Dienst unter zwei Namen und startet das Programm doppelt (Fehler bis v4.3.2). Die Version 4.0.0
+hieß noch `Klingel-Dashboard-Brume2`; der Installer übernimmt `config.ini` und ffmpeg daraus
+und entfernt den alten Ordner.
 
 **Brume ohne Internet:** `ffmpeg-release-arm64-static.tar.xz` von
 <https://johnvansickle.com/ffmpeg/> auf dem PC laden und in denselben Ordner wie die
@@ -232,6 +234,14 @@ ist. Für Ton bei gesperrtem iPad: Lautlos-Schalter aus, Seite im Vordergrund la
 
 ## Versionsverlauf
 
+* **v4.3.3** – Autostart nur noch einmal
+  * Ursache der doppelten Instanzen gefunden: `/etc/init.d/klingel-dashboard` war seit
+    v4.0.1 ein Verweis. OpenWrt benennt einen Dienst nach dem Verweisziel – beim Booten hieß
+    er `klingel-dashboard`, beim manuellen Start `klingel-dashboard.init`. Zwei Dienste
+    starteten das Programm doppelt (v4.3.2: beendeten sich gegenseitig, kein Kamerabild)
+  * Autostart-Skript ist wieder eine echte Datei; der Installer entfernt beide alten
+    Dienste über `ubus` und warnt, falls OpenWrt noch zwei Dienste führt
+
 * **v4.3.2** – nur noch eine Instanz
   * Fehler behoben: beim Update lief die alte Version weiter (hielt die Ports, iPads zeigten
     die alte Versionsnummer) und beide Instanzen warfen sich beim MQTT-Broker gegenseitig
@@ -297,7 +307,7 @@ ist. Für Ton bei gesperrtem iPad: Lautlos-Schalter aus, Seite im Vordergrund la
 
 * **v4.0.1** – alles in einem Ordner `/root/Klingel-Dashboard`
   * Ordner wird als Erstes angelegt (auch bei Abbruch sichtbar, mit `logs/install.log`)
-  * Betriebsprotokoll `logs/klingel.log`, Autostart-Skript als Verweis aus dem Ordner
+  * Betriebsprotokoll `logs/klingel.log`, Autostart-Skript aus dem Ordner
   * Installationspaket wird nach `paket/` verschoben, `uninstall.sh --alles`
 
 * **v4.0.0** – Version für GL.iNet Brume 2 (Python, nur Standardbibliothek)

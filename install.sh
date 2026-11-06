@@ -1,19 +1,18 @@
 #!/bin/sh
 # ════════════════════════════════════════════════════════════════════
-#  Klingel-Dashboard Brume 2 – Installer v4.3.2
+#  Klingel-Dashboard Brume 2 – Installer v4.3.3
 #  für GL.iNet Brume 2 (GL-MT2500, OpenWrt / GL-Firmware 4.x)
 #
 #  Alles liegt danach in EINEM Ordner:  /root/Klingel-Dashboard
 #    klingel_server.py, web/, config.ini, bin/ffmpeg, logs/, files/,
 #    install.sh, uninstall.sh, ANLEITUNG.md, VERSION, paket/
-#  Außerhalb des Ordners gibt es nur den Verweis
-#    /etc/init.d/klingel-dashboard -> /root/Klingel-Dashboard/files/klingel-dashboard.init
-#  (nötig für den Autostart).
+#  Außerhalb des Ordners gibt es nur die Kopie des Autostart-Skripts
+#    /etc/init.d/klingel-dashboard  (Vorlage: files/klingel-dashboard.init)
 #
 #  Mehrfach ausführbar (Update). Eine vorhandene config.ini bleibt erhalten.
 # ════════════════════════════════════════════════════════════════════
 
-VERSION="4.3.2"
+VERSION="4.3.3"
 APP_DIR=${KLINGEL_APP_DIR:-/root/Klingel-Dashboard}
 INIT=${KLINGEL_INIT:-/etc/init.d/klingel-dashboard}
 OLD_DIR=/root/Klingel-Dashboard-Brume2          # Ordnername von v4.0.0
@@ -192,9 +191,20 @@ INIT_SRC="$APP_DIR/files/klingel-dashboard.init"
 [ -f "$INIT_SRC" ] || die "Init-Skript fehlt"
 sed -i "s#^APP_DIR=.*#APP_DIR=$APP_DIR#" "$INIT_SRC"
 chmod +x "$INIT_SRC"
+# Alte Dienste entfernen. v4.0.1–v4.3.2 legten einen Verweis an; OpenWrt benennt den
+# Dienst dann nach dem Verweisziel ("klingel-dashboard.init") beim manuellen Start und
+# "klingel-dashboard" beim Booten -> zwei Dienste, zwei Instanzen.
+[ -x "$INIT" ] && "$INIT" stop >/dev/null 2>&1
+if command -v ubus >/dev/null 2>&1; then
+	for svc in klingel-dashboard klingel-dashboard.init; do
+		ubus call service delete "{\"name\":\"$svc\"}" >/dev/null 2>&1
+	done
+fi
 rm -f "$INIT"
-ln -s "$INIT_SRC" "$INIT" || die "Verweis $INIT konnte nicht angelegt werden"
-"$INIT" enable && ok "Autostart aktiv ($INIT -> $INIT_SRC)"
+# echte Kopie, KEIN Verweis
+cp "$INIT_SRC" "$INIT" || die "$INIT konnte nicht angelegt werden"
+chmod +x "$INIT"
+"$INIT" enable && ok "Autostart aktiv ($INIT)"
 
 # Bei Firmware-Updates der Brume behalten
 if [ -f /etc/sysupgrade.conf ]; then
@@ -206,7 +216,6 @@ fi
 
 # ── 5. Start ─────────────────────────────────────────────────────────
 say "Dienst starten"
-"$INIT" stop >/dev/null 2>&1
 sleep 1
 # alle noch laufenden Klingel-Prozesse beenden (auch ältere Versionen,
 # die nicht über den Autostart gestartet wurden)
@@ -231,6 +240,10 @@ for i in $(seq 1 20); do
 	[ -n "$GOT" ] && break
 done
 N=$(running_pids | wc -l)
+if command -v ubus >/dev/null 2>&1; then
+	SVC=$(ubus call service list 2>/dev/null | grep -c '"klingel-dashboard')
+	[ "$SVC" -gt 1 ] && warn "OpenWrt führt $SVC Klingel-Dienste – bitte Brume neu starten"
+fi
 if [ "$GOT" = "$VERSION" ] && [ "$N" -eq 1 ]; then
 	ok "Dienst läuft: v$GOT, 1 Instanz"
 else

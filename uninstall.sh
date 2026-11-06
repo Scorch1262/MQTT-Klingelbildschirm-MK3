@@ -7,6 +7,12 @@ INIT=/etc/init.d/klingel-dashboard
 
 [ -e "$INIT" ] && "$INIT" stop && "$INIT" disable
 rm -f "$INIT"
+if command -v ubus >/dev/null 2>&1; then
+	for svc in klingel-dashboard klingel-dashboard.init; do
+		ubus call service delete "{\"name\":\"$svc\"}" >/dev/null 2>&1
+	done
+fi
+for p in $(ps w | grep '[k]lingel_server.py' | awk '{print $1}'); do kill $p; done
 if command -v uci >/dev/null 2>&1 && uci -q get firewall.klingel_dashboard >/dev/null; then
 	uci delete firewall.klingel_dashboard && uci commit firewall && /etc/init.d/firewall reload >/dev/null 2>&1
 fi
