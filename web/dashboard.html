@@ -89,6 +89,12 @@ header h1 span.acc { color: #ff9142; }
 .offline svg { opacity: 0.3; margin-bottom: 12px; }
 .offline .t { font-size: 13px; letter-spacing: 0.1em; color: #c9ced6; }
 .offline .h { font-size: 11px; margin-top: 10px; max-width: 520px; line-height: 1.6; }
+.video-card.switch { cursor: pointer; }
+.motion { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
+.motion div { position: absolute; border: 3px solid #ff3b3b; border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.6), 0 0 10px rgba(255,59,59,0.55); }
+.cam-hint { position: absolute; top: 10px; right: 12px; font-size: 10px; color: #e5e8ec; letter-spacing: 0.08em;
+  background: rgba(10,12,15,0.65); border: 1px solid #242a33; border-radius: 20px; padding: 3px 10px; pointer-events: none; }
 .cam-badge {
   position: absolute; bottom: 10px; left: 12px; font-size: 10px; color: #3ddc97;
   letter-spacing: 0.1em; opacity: 0.8; text-shadow: 0 0 4px #000;
@@ -184,7 +190,7 @@ header h1 span.acc { color: #ff9142; }
 <div class="layout">
   <div class="video-panel">
     <div class="panel-label" id="panelLabel">{{TITLE}} — Live</div>
-    <div class="video-card">
+    <div class="video-card" id="videoCard">
       <img id="camImg" alt="">
       <div class="offline" id="offline">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
@@ -195,7 +201,9 @@ header h1 span.acc { color: #ff9142; }
         <div class="t mono" id="offText">VERBINDE …</div>
         <div class="h mono" id="offHint"></div>
       </div>
+      <div class="motion" id="motion"></div>
       <div class="cam-badge mono" id="camBadge" style="display:none">CH-01 • LIVE</div>
+      <div class="cam-hint mono" id="camHint" style="display:none"></div>
       <button type="button" class="audio-banner" id="audioBanner" style="display:none">&#128266; Klingelton einschalten – hier tippen</button>
     </div>
   </div>
@@ -590,35 +598,51 @@ function ringBell(id) {
   if (el) { delClass(el, 'active'); void el.offsetWidth; addClass(el, 'active'); }
   playDoorbell(String(bellNames[id] || 'Klingel'));
   addLog('BELL: ' + String(bellNames[id] || ('B' + id)).toUpperCase() + ' KLINGELT', 'hi');
-  if (camMode === 'einzelbild') loadSnapshot();
+  if (curCam !== 1) switchCam(1, 'Klingel');
+  else if (camMode === 'einzelbild') loadSnapshot();
 }
 
 /* ═════════════ KAMERA ═════════════
+   Zwei Kameras: 1 = primär, 2 = sekundär (Tippen aufs Bild schaltet um, Klingeln schaltet auf 1).
    auto: MJPEG-Video; liefert es dem Browser keine Bilder, Wechsel auf Einzelbilder. */
 var img = $('camImg');
 var cid = 'c' + Math.floor(Math.random() * 1e9).toString(36) + now().toString(36);
-var camMode = CFG.bildmodus === 'einzelbild' ? 'einzelbild' : 'mjpeg';
-var mjpegStarted = 0, lastClientFrames = 0, lastFrameAt = 0, mjpegRetries = 0, snapBusy = false, snapTimer = null;
-var camVisible = false, camLoggedState = '';
+var curCam = 1;
+function camCfg(n) {
+  return n === 2 ? { on: !!CFG.cam2, bildmodus: CFG.cam2_bildmodus || 'auto', fps: CFG.cam2_fps || 2 }
+                 : { on: !!CFG.cam, bildmodus: CFG.bildmodus || 'auto', fps: CFG.fps || 2 };
+}
+var camMode = camCfg(1).bildmodus === 'einzelbild' ? 'einzelbild' : 'mjpeg';
+var mjpegStarted = 0, lastClientFrames = -1, lastFrameAt = 0, mjpegRetries = 0, snapBusy = false, snapTimer = null;
+var camVisible = false, camLoggedState = '', switchedAt = 0;
 
+function camLabel() {
+  $('camBadge').innerHTML = (curCam === 1 ? 'CH-01' : 'CH-02') + ' • LIVE';
+  var h = $('camHint');
+  if (CFG.cam2) {
+    h.style.display = '';
+    h.innerHTML = (curCam === 1 ? 'KAMERA 1' : 'KAMERA 2') + ' · TIPPEN = ' + (curCam === 1 ? 'KAMERA 2' : 'KAMERA 1');
+  } else h.style.display = 'none';
+}
 function showFrame(on) {
   img.style.display = on ? 'block' : 'none';
   $('offline').style.display = on ? 'none' : '';
   $('camBadge').style.display = on ? '' : 'none';
   setClass($('camDot'), 'on', on);
+  if (!on) drawMotion([]);
   if (on !== camVisible) { camVisible = on; addLog(on ? 'CAM: Bild da' : 'CAM: kein Bild', on ? '' : 'er'); }
 }
 function offlineText(t, h) { $('offText').innerHTML = ''; $('offText').appendChild(document.createTextNode(t)); $('offHint').innerHTML = ''; $('offHint').appendChild(document.createTextNode(h || '')); }
 
 /* Dauerbetrieb auf dem iPad: Safari hält einen MJPEG-Strom über viele Stunden nicht
    zuverlässig – alle 20 min neu verbinden (ohne Seiten-Neuladen, Ton bleibt freigegeben). */
-setInterval(function () { if (camMode === 'mjpeg' && CFG.cam && !document.hidden) startMjpeg(); }, 20 * 60 * 1000);
+setInterval(function () { if (camMode === 'mjpeg' && camCfg(curCam).on && !document.hidden) startMjpeg(); }, 20 * 60 * 1000);
 function startMjpeg() {
   camMode = 'mjpeg';
   mjpegStarted = now();
   img.onload = function () { lastFrameAt = now(); };
   img.onerror = null;
-  img.src = '/stream.mjpg?cid=' + cid + '&t=' + now();
+  img.src = '/stream.mjpg?cam=' + curCam + '&cid=' + cid + '&t=' + now();
 }
 function stopStream() { img.onload = null; img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACw='; }
 function switchToSnapshots(reason) {
@@ -632,45 +656,96 @@ function loadSnapshot() {
   if (snapBusy || document.hidden) return;
   snapBusy = true;
   if (snapTimer) { clearTimeout(snapTimer); snapTimer = null; }
-  var im = new Image();
+  var im = new Image(), forCam = curCam;
   var finished = false;
   var to = setTimeout(function () { if (!finished) { finished = true; snapBusy = false; next(2000); } }, 10000);
   function next(ms) { if (camMode === 'einzelbild') snapTimer = setTimeout(loadSnapshot, ms); }
   im.onload = function () {
-    if (finished) return; finished = true; clearTimeout(to);
-    img.src = im.src; lastFrameAt = now(); snapBusy = false;
-    next(Math.max(150, 1000 / (CFG.fps || 2)));
+    if (finished) return; finished = true; clearTimeout(to); snapBusy = false;
+    if (forCam !== curCam) { next(50); return; }          /* inzwischen umgeschaltet */
+    img.src = im.src; lastFrameAt = now();
+    next(Math.max(150, 1000 / camCfg(curCam).fps));
   };
   im.onerror = function () {
     if (finished) return; finished = true; clearTimeout(to); snapBusy = false; next(2500);
   };
-  im.src = '/snapshot.jpg?cid=' + cid + '&t=' + now();
+  im.src = '/snapshot.jpg?cam=' + forCam + '&cid=' + cid + '&t=' + now();
+}
+function startCam() {
+  if (!camCfg(curCam).on) { showFrame(false); offlineText('KEINE KAMERA EINGERICHTET', 'Kamera-URL auf der Einrichtungsseite eintragen.'); return; }
+  camMode = camCfg(curCam).bildmodus === 'einzelbild' ? 'einzelbild' : 'mjpeg';
+  if (camMode === 'mjpeg') startMjpeg(); else loadSnapshot();
+}
+function switchCam(n, why) {
+  if (n === curCam || (n === 2 && !CFG.cam2)) return;
+  stopStream();
+  if (snapTimer) { clearTimeout(snapTimer); snapTimer = null; }
+  curCam = n; switchedAt = now();
+  lastFrameAt = 0; lastClientFrames = -1; mjpegRetries = 0;
+  camLabel();
+  showFrame(false); offlineText('UMSCHALTEN AUF KAMERA ' + n + ' …', '');
+  addLog('CAM: Kamera ' + n + (why ? ' (' + why + ')' : ''));
+  startCam();
+}
+/* Tippen aufs Bild schaltet zwischen den Kameras um */
+$('videoCard').addEventListener('click', function (e) {
+  var t = e.target;
+  while (t && t !== this) { if (t.id === 'audioBanner') return; t = t.parentNode; }
+  if (!CFG.cam2) return;
+  switchCam(curCam === 1 ? 2 : 1, 'Tippen');
+}, false);
+
+/* ── Bewegungsmarkierung: Rechtecke (0…1) über das sichtbare Bild legen ── */
+var motionEls = [];
+function drawMotion(boxes) {
+  var box = $('motion');
+  var card = $('videoCard');
+  var nw = img.naturalWidth, nh = img.naturalHeight;
+  var cw = card.clientWidth, ch = card.clientHeight;
+  if (!boxes || !boxes.length || !nw || !nh || curCam !== 1 || img.style.display === 'none') boxes = [];
+  var sc = Math.min(cw / nw, ch / nh), dw = nw * sc, dh = nh * sc;
+  var ox = (cw - dw) / 2, oy = (ch - dh) / 2;
+  for (var i = 0; i < boxes.length; i++) {
+    var el = motionEls[i];
+    if (!el) { el = document.createElement('div'); box.appendChild(el); motionEls[i] = el; }
+    var b = boxes[i];
+    el.style.left = Math.round(ox + b[0] * dw - 3) + 'px';
+    el.style.top = Math.round(oy + b[1] * dh - 3) + 'px';
+    el.style.width = Math.round(b[2] * dw) + 'px';
+    el.style.height = Math.round(b[3] * dh) + 'px';
+    el.style.display = '';
+  }
+  for (var j = boxes.length; j < motionEls.length; j++) motionEls[j].style.display = 'none';
 }
 
 function camUpdate(c) {
-  if (!CFG.cam) { showFrame(false); offlineText('KEINE KAMERA EINGERICHTET', 'Kamera-URL auf der Einrichtungsseite eintragen.'); return; }
+  if (!camCfg(curCam).on) { showFrame(false); offlineText('KEINE KAMERA EINGERICHTET', 'Kamera-URL auf der Einrichtungsseite eintragen.'); return; }
+  if (c.n && c.n !== curCam) return;                     /* Antwort von vor dem Umschalten */
   var t = now();
   if (camMode === 'mjpeg') {
-    if (c.client_frames > lastClientFrames) { lastClientFrames = c.client_frames; lastFrameAt = t; mjpegRetries = 0; }
+    if (lastClientFrames < 0) lastClientFrames = c.client_frames;   /* Startwert nach Umschalten */
+    else if (c.client_frames > lastClientFrames) { lastClientFrames = c.client_frames; lastFrameAt = t; mjpegRetries = 0; }
     if (c.state === 'laeuft' && t - mjpegStarted > 8000 && t - lastFrameAt > 6000) {
       mjpegRetries++;
-      if (CFG.bildmodus === 'auto' && (lastClientFrames === 0 || mjpegRetries >= 3)) switchToSnapshots('Video kommt nicht an');
+      if (camCfg(curCam).bildmodus === 'auto' && (lastClientFrames <= 0 || mjpegRetries >= 3)) switchToSnapshots('Video kommt nicht an');
       else { addLog('CAM: Video neu verbinden'); startMjpeg(); }
     }
   }
   var fresh = lastFrameAt && (t - lastFrameAt < 6000);
   showFrame(!!fresh);
+  if (fresh) drawMotion(c.boxes || []);
   if (!fresh) {
     if (c.state === 'fehler') offlineText('KAMERA-FEHLER', c.msg || '');
     else if (c.state === 'aus') offlineText('KEINE KAMERA EINGERICHTET', c.msg || '');
     else if (c.state === 'laeuft') offlineText('LADE BILD …', '');
-    else offlineText('VERBINDE MIT KAMERA …', c.msg || '');
+    else offlineText(t - switchedAt < 15000 && switchedAt ? 'UMSCHALTEN AUF KAMERA ' + curCam + ' …' : 'VERBINDE MIT KAMERA …', c.msg || '');
   }
   if (c.state + c.msg !== camLoggedState) {
     camLoggedState = c.state + c.msg;
-    if (c.state === 'fehler') addLog('CAM: ' + c.msg, 'er');
+    if (c.state === 'fehler') addLog('CAM ' + curCam + ': ' + c.msg, 'er');
   }
 }
+window.addEventListener('resize', function () { drawMotion([]); }, false);
 
 /* ═════════════ AUSSENTEMPERATUR ═════════════ */
 var WX_SVG = {
@@ -712,7 +787,7 @@ function wxUpdate(w) {
 /* ═════════════ STATUS-ABFRAGE ═════════════ */
 var pollFails = 0, online = null;
 function poll() {
-  xhr('GET', '/api/poll?cid=' + cid + '&view=' + (document.hidden ? 0 : 1) + '&t=' + now(), function (d) {
+  xhr('GET', '/api/poll?cam=' + curCam + '&cid=' + cid + '&view=' + (document.hidden ? 0 : 1) + '&t=' + now(), function (d) {
     if (!d) { setTimeout(poll, 1000); return; }
     pollFails = 0;
     if (online !== true) { online = true; addLog('SYS: Verbindung zur Brume OK'); }
@@ -757,7 +832,7 @@ document.addEventListener('visibilitychange', function () {
   else {
     audioUi();
     setTimeout(function () { audioHealthCheck('Seite wieder sichtbar'); }, 1000);
-    if (camMode === 'mjpeg' && CFG.cam) startMjpeg(); else loadSnapshot();
+    if (camMode === 'mjpeg' && camCfg(curCam).on) startMjpeg(); else loadSnapshot();
   }
 }, false);
 window.addEventListener('pageshow', function () { audioUi(); }, false);
@@ -769,6 +844,8 @@ setInterval(tick, 1000); tick();
 /* ── Start ── */
 makeBellEl(); audioUi();
 addLog('SYS: Dashboard geladen v' + CFG.version);
+camLabel();
+if (CFG.cam2) addClass($('videoCard'), 'switch');
 if (CFG.cam) { if (camMode === 'mjpeg') startMjpeg(); else loadSnapshot(); }
 else { offlineText('KEINE KAMERA EINGERICHTET', 'Kamera-URL auf der Einrichtungsseite eintragen.'); }
 poll();

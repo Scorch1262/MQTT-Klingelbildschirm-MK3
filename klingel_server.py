@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Klingel-Dashboard Brume 2  –  v4.3.3
+Klingel-Dashboard Brume 2  –  v4.4.0
 ====================================
 
 Laeuft auf einem GL.iNet Brume 2 (GL-MT2500, OpenWrt) im Autostart und stellt bereit:
@@ -38,7 +38,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
 APP_NAME = "Klingel-Dashboard Brume 2"
-APP_VERSION = "4.3.3"
+APP_VERSION = "4.4.0"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get("KLINGEL_CONFIG") or os.path.join(BASE_DIR, "config.ini")
@@ -85,6 +85,31 @@ def _f(sec, key, typ, default, label, hint="", **kw):
     return d
 
 
+def cam_fields(sec, typ, url):
+    return [
+        _f(sec, "kamera_typ", "choice", typ, "Kameraquelle",
+           "rtsp = Videostream über ffmpeg (RTSP oder HTTP), jpeg = Standbild-URL der Kamera",
+           options=["rtsp", "jpeg", "aus"]),
+        _f(sec, "kamera_url", "str", url, "Kamera-URL",
+           "dieselbe URL wie in VLC; Zugangsdaten besser in die Felder darunter"),
+        _f(sec, "kamera_benutzer", "str", "", "Kamera-Benutzer"),
+        _f(sec, "kamera_passwort", "pass", "", "Kamera-Passwort"),
+        _f(sec, "rtsp_transport", "choice", "tcp", "RTSP-Transport",
+           "tcp ist fast immer richtig", options=["tcp", "udp"]),
+        _f(sec, "bilder_pro_sekunde", "int", 8, "Bilder pro Sekunde", min=1, max=25),
+        _f(sec, "max_breite", "int", 960, "Maximale Bildbreite (Pixel)",
+           "kleiner = weniger Last für Brume und iPad", min=160, max=1920),
+        _f(sec, "jpeg_qualitaet", "int", 75, "JPEG-Qualität (%)", min=30, max=95),
+        _f(sec, "sparmodus", "bool", False, "Sparmodus (nur Schlüsselbilder)",
+           "sehr wenig CPU, dafür meist nur 1 Bild pro Sekunde oder weniger"),
+        _f(sec, "immer_aktiv", "bool", False, "Kamera dauerhaft abrufen",
+           "sonst nur, solange ein Dashboard sie anzeigt (+30 s)"),
+        _f(sec, "bildmodus", "choice", "auto", "Bildmodus im Browser",
+           "auto = Video (MJPEG), bei Problemen automatisch Einzelbilder",
+           options=["auto", "mjpeg", "einzelbild"]),
+    ]
+
+
 def build_schema():
     s = [
         _f("allgemein", "einrichtung_port", "port", 8083, "Port der Einrichtungsseite"),
@@ -121,30 +146,16 @@ def build_schema():
         _f("wetter", "laenge", "str", "", "Längengrad (optional)", "z. B. 9.99"),
         _f("wetter", "intervall_min", "int", 10, "Aktualisieren alle (Minuten)", min=5, max=120),
     ]
-    # Eine Kamera (ein RTSP-Stream) für beide Dashboards
-    sec = "kamera"
+    # Primäre und sekundäre Kamera – beide auf beiden Dashboards (Umschalten per Tippen)
+    s += cam_fields("kamera", "rtsp", "rtsp://192.168.1.200:554/stream2")
+    s += cam_fields("kamera2", "aus", "")
     s += [
-            _f(sec, "kamera_typ", "choice", "rtsp", "Kameraquelle",
-               "rtsp = Videostream über ffmpeg (RTSP oder HTTP), jpeg = Standbild-URL der Kamera",
-               options=["rtsp", "jpeg", "aus"]),
-            _f(sec, "kamera_url", "str",
-               "rtsp://192.168.1.200:554/stream2", "Kamera-URL",
-               "dieselbe URL wie in VLC; Zugangsdaten besser in die Felder darunter"),
-            _f(sec, "kamera_benutzer", "str", "", "Kamera-Benutzer"),
-            _f(sec, "kamera_passwort", "pass", "", "Kamera-Passwort"),
-            _f(sec, "rtsp_transport", "choice", "tcp", "RTSP-Transport",
-               "tcp ist fast immer richtig", options=["tcp", "udp"]),
-            _f(sec, "bilder_pro_sekunde", "int", 8, "Bilder pro Sekunde", min=1, max=25),
-            _f(sec, "max_breite", "int", 960, "Maximale Bildbreite (Pixel)",
-               "kleiner = weniger Last für Brume und iPad", min=160, max=1920),
-            _f(sec, "jpeg_qualitaet", "int", 75, "JPEG-Qualität (%)", min=30, max=95),
-            _f(sec, "sparmodus", "bool", False, "Sparmodus (nur Schlüsselbilder)",
-               "sehr wenig CPU, dafür meist nur 1 Bild pro Sekunde oder weniger"),
-            _f(sec, "immer_aktiv", "bool", False, "Kamera dauerhaft abrufen",
-               "sonst nur, solange ein Dashboard sie anzeigt (+30 s)"),
-            _f(sec, "bildmodus", "choice", "auto", "Bildmodus im Browser",
-               "auto = Video (MJPEG), bei Problemen automatisch Einzelbilder",
-               options=["auto", "mjpeg", "einzelbild"]),
+        _f("bewegung", "aktiv", "bool", True, "Bewegung im primären Bild rot markieren",
+           "nur bei Kameraquelle rtsp; die Brume vergleicht ein kleines Graustufenbild"),
+        _f("bewegung", "haltezeit_s", "int", 5, "Markierung entfernen nach (Sekunden ohne Veränderung)",
+           min=1, max=120),
+        _f("bewegung", "empfindlichkeit", "int", 5, "Empfindlichkeit (1 = nur starke, 10 = schon kleine Bewegungen)",
+           min=1, max=10),
     ]
     for n in range(1, NUM_SITES + 1):
         sec = "dashboard%d" % n
@@ -169,7 +180,9 @@ SECTION_TITLES = {
     "allgemein": "Allgemein",
     "mqtt": "MQTT-Broker",
     "oeffner": "Türöffner (beide Dashboards)",
-    "kamera": "Kamera (beide Dashboards)",
+    "kamera": "Primäre Kamera (beide Dashboards)",
+    "kamera2": "Sekundäre Kamera (per Tippen aufs Bild umschalten)",
+    "bewegung": "Bewegungsmarkierung (primäre Kamera)",
     "wetter": "Außentemperatur",
 }
 for _n in range(1, NUM_SITES + 1):
@@ -308,9 +321,10 @@ def save_config(cfg):
 CFG = load_config()
 
 
-def cam_cfg():
-    """Einstellungen der gemeinsamen Kamera."""
-    return {k[7:]: v for k, v in CFG.items() if k.startswith("kamera.")}
+def cam_cfg(sec="kamera"):
+    """Einstellungen einer Kamera ("kamera" = primär, "kamera2" = sekundär)."""
+    p = sec + "."
+    return {k[len(p):]: v for k, v in CFG.items() if k.startswith(p)}
 
 
 def site_cfg(n):
@@ -704,7 +718,11 @@ def mask_url(url):
     return re.sub(r"(://[^:/@]+):[^@/]*@", r"\1:***@", url)
 
 
-def ffmpeg_args(cam, url, single=False):
+MOTION_W, MOTION_H, MOTION_FPS = 64, 48, 5
+MOTION_CELL = 4                                   # Raster 16 x 12 Zellen
+
+
+def ffmpeg_args(cam, url, single=False, motion_fd=None):
     q = int(round(2 + (95 - cam["jpeg_qualitaet"]) * 20.0 / 65.0))
     args = [FFMPEG["path"], "-hide_banner", "-nostdin", "-loglevel", "error"]
     if url.lower().startswith("rtsp"):
@@ -729,7 +747,127 @@ def ffmpeg_args(cam, url, single=False):
         args += ["-frames:v", "1", "-f", "image2", "pipe:1"]
     else:
         args += ["-flush_packets", "1", "-f", "mjpeg", "pipe:1"]
+        if motion_fd is not None:
+            # zweite Ausgabe: winziges Graustufenbild für die Bewegungserkennung
+            args += ["-an", "-sn", "-dn",
+                     "-vf", "fps=%d,scale=%d:%d,format=gray" % (MOTION_FPS, MOTION_W, MOTION_H),
+                     "-flush_packets", "1", "-f", "rawvideo", "pipe:%d" % motion_fd]
     return args
+
+
+class MotionDetector:
+    """Vergleicht jedes Graustufenbild (64x48) mit einem Hintergrundbild, das sich langsam
+    an die Szene anpasst (gleitender Mittelwert, ein stehendes Objekt ist nach ca. 2 s
+    "Hintergrund"). So wird die ganze bewegte Fläche erfasst, nicht nur ihre Kanten.
+    Raster 16x12: eine Zelle gilt als verändert, wenn genug Pixel deutlich abweichen – in
+    zwei aufeinanderfolgenden Bildern (gegen Bildrauschen). Weicht mehr als die Hälfte
+    aller Zellen ab (Licht an/aus, Tag/Nacht-Umschaltung), wird der Hintergrund neu gesetzt.
+    Rechtecke umfassen zusammenhängende Zellen, die sich innerhalb der Haltezeit verändert haben."""
+
+    def __init__(self):
+        self.gw, self.gh = MOTION_W // MOTION_CELL, MOTION_H // MOTION_CELL
+        self.prev = None
+        self.prev_hit = [False] * (self.gw * self.gh)
+        self.last = [0.0] * (self.gw * self.gh)
+        self.lock = threading.Lock()
+        self.frames = 0
+
+    BG_ALPHA = 0.25          # Anpassung je Bild (5 Bilder/s -> ~95 % nach 2,4 s)
+
+    def reset(self):
+        with self.lock:
+            self.prev = None
+            self.prev_hit = [False] * (self.gw * self.gh)
+            self.last = [0.0] * (self.gw * self.gh)
+
+    def feed(self, frame, sens):
+        sens = max(1, min(10, sens))
+        thr = int(52 - sens * 4)                    # Grauwert-Unterschied pro Pixel (48 … 12)
+        min_px = max(2, int(round(10 - sens * 0.8)))  # veränderte Pixel je Zelle (von 16)
+        bg = self.prev
+        self.frames += 1
+        if bg is None or len(bg) != len(frame):
+            self.prev = [float(v) for v in frame]
+            return
+        prev = bg
+        W, C, gw, gh = MOTION_W, MOTION_CELL, self.gw, self.gh
+        hits = [False] * (gw * gh)
+        n_hit = 0
+        for cy in range(gh):
+            for cx in range(gw):
+                cnt = 0
+                for yy in range(cy * C, cy * C + C):
+                    o = yy * W + cx * C
+                    for xx in range(o, o + C):
+                        d = frame[xx] - prev[xx]
+                        if d > thr or -d > thr:
+                            cnt += 1
+                if cnt >= min_px:
+                    hits[cy * gw + cx] = True
+                    n_hit += 1
+        a = self.BG_ALPHA
+        if n_hit > gw * gh // 2:                    # Helligkeitssprung -> Hintergrund neu
+            self.prev = [float(v) for v in frame]
+            self.prev_hit = [False] * (gw * gh)
+            return
+        self.prev = [b + a * (f - b) for b, f in zip(bg, frame)]
+        now = time.time()
+        with self.lock:
+            for i, h in enumerate(hits):
+                if h and self.prev_hit[i]:
+                    self.last[i] = now
+            self.prev_hit = hits
+
+    def boxes(self, hold):
+        """-> Liste von [x, y, b, h] (0…1) der Bereiche mit Veränderung in den letzten `hold` s."""
+        now = time.time()
+        gw, gh = self.gw, self.gh
+        with self.lock:
+            act = [now - t < hold for t in self.last]
+        seen = [False] * (gw * gh)
+        out = []
+        for i in range(gw * gh):
+            if not act[i] or seen[i]:
+                continue
+            stack = [i]
+            seen[i] = True
+            x0 = x1 = i % gw
+            y0 = y1 = i // gw
+            while stack:
+                k = stack.pop()
+                kx, ky = k % gw, k // gw
+                x0, x1, y0, y1 = min(x0, kx), max(x1, kx), min(y0, ky), max(y1, ky)
+                for dy in (-1, 0, 1):        # Nachbarn inkl. Diagonale und 1 Zelle Lücke
+                    for dx in (-2, -1, 0, 1, 2):
+                        nx, ny = kx + dx, ky + dy
+                        if 0 <= nx < gw and 0 <= ny < gh:
+                            j = ny * gw + nx
+                            if act[j] and not seen[j]:
+                                seen[j] = True
+                                stack.append(j)
+            out.append([x0, y0, x1, y1])
+        # überlappende Rechtecke zusammenfassen
+        merged = True
+        while merged and len(out) > 1:
+            merged = False
+            for a in range(len(out)):
+                for b in range(a + 1, len(out)):
+                    A, B = out[a], out[b]
+                    if A[0] <= B[2] + 1 and B[0] <= A[2] + 1 and A[1] <= B[3] + 1 and B[1] <= A[3] + 1:
+                        out[a] = [min(A[0], B[0]), min(A[1], B[1]), max(A[2], B[2]), max(A[3], B[3])]
+                        del out[b]
+                        merged = True
+                        break
+                if merged:
+                    break
+        res = []
+        for b in out:   # halbe Zelle Rand, damit teilweise erfasste Randzellen mit drin sind
+            x0 = max(0.0, (b[0] - 0.5) / gw)
+            y0 = max(0.0, (b[1] - 0.5) / gh)
+            x1 = min(1.0, (b[2] + 1.5) / gw)
+            y1 = min(1.0, (b[3] + 1.5) / gh)
+            res.append([round(x0, 4), round(y0, 4), round(x1 - x0, 4), round(y1 - y0, 4)])
+        return res
 
 
 def grab_single_frame(cam, timeout=20):
@@ -789,10 +927,12 @@ def fetch_jpeg(url, user, pw, timeout):
 # ═══════════════════════════════════════════════════════════════════════════
 
 class Camera(threading.Thread):
-    def __init__(self):
-        threading.Thread.__init__(self, daemon=True, name="kamera")
-        self.n = 1
-        self.cfg = cam_cfg()
+    def __init__(self, n=1, sec="kamera"):
+        threading.Thread.__init__(self, daemon=True, name=sec)
+        self.n = n
+        self.tag = "KAMERA" if n == 1 else "KAMERA%d" % n
+        self.cfg = cam_cfg(sec)
+        self.motion = MotionDetector() if (n == 1 and CFG["bewegung.aktiv"]) else None
         self.cond = threading.Condition()
         self.frame = None
         self.frame_id = 0
@@ -861,15 +1001,18 @@ class Camera(threading.Thread):
             self.state = "laeuft"
             self.message = ""
             self.detail = ""
-            log("KAMERA", "Bild empfangen (%dx%d)" % jpeg_size(data))
+            log(self.tag, "Bild empfangen (%dx%d)" % jpeg_size(data))
 
     def status(self):
         age = time.time() - self.frame_time if self.frame_time else None
-        return {"state": self.state, "msg": self.message, "detail": self.detail,
-                "fps": round(self.fps if self.state == "laeuft" else 0, 1),
-                "w": self.size[0], "h": self.size[1],
-                "age": round(age, 1) if age is not None else None,
-                "typ": self.cfg["kamera_typ"]}
+        st = {"state": self.state, "msg": self.message, "detail": self.detail,
+              "fps": round(self.fps if self.state == "laeuft" else 0, 1),
+              "w": self.size[0], "h": self.size[1],
+              "age": round(age, 1) if age is not None else None,
+              "typ": self.cfg["kamera_typ"], "n": self.n}
+        if self.motion is not None and self.state == "laeuft" and self.cfg["kamera_typ"] == "rtsp":
+            st["boxes"] = self.motion.boxes(CFG["bewegung.haltezeit_s"])
+        return st
 
     # -- Ablauf -------------------------------------------------------------
     def run(self):
@@ -892,7 +1035,7 @@ class Camera(threading.Thread):
                     ok = self._run_ffmpeg()
             except Exception as e:  # noqa
                 self.state, self.message = "fehler", "interner Fehler: %s" % e
-                log("KAMERA", self.message)
+                log(self.tag, self.message)
             if self.stop_evt.is_set():
                 break
             if ok:
@@ -908,13 +1051,43 @@ class Camera(threading.Thread):
             return False
         url = with_credentials(self.cfg["kamera_url"].strip(), self.cfg["kamera_benutzer"],
                                self.cfg["kamera_passwort"])
-        args = ffmpeg_args(self.cfg, url)
+        mr = mw = None
+        if self.motion is not None:
+            mr, mw = os.pipe()
+            self.motion.reset()
+        args = ffmpeg_args(self.cfg, url, motion_fd=mw)
         if self.state != "laeuft":
             self.state, self.message = "verbinde", "verbinde mit Kamera ..."
-        log("KAMERA", "starte ffmpeg: %s" % mask_url(url))
+        log(self.tag, "starte ffmpeg: %s%s" % (mask_url(url), " (mit Bewegungserkennung)" if mw else ""))
         err_lines = []
-        proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
+        try:
+            proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0,
+                                    pass_fds=(mw,) if mw is not None else ())
+        finally:
+            if mw is not None:
+                os.close(mw)
         self.proc = proc
+
+        if mr is not None:
+            def read_motion(fd=mr):
+                size = MOTION_W * MOTION_H
+                buf = bytearray()
+                try:
+                    while True:
+                        chunk = os.read(fd, 65536)
+                        if not chunk:
+                            break
+                        buf += chunk
+                        while len(buf) >= size:
+                            frame = bytes(buf[:size])
+                            del buf[:size]
+                            try:
+                                self.motion.feed(frame, CFG["bewegung.empfindlichkeit"])
+                            except Exception as e:  # noqa
+                                log(self.tag, "Bewegungserkennung: %s" % e)
+                finally:
+                    os.close(fd)
+            threading.Thread(target=read_motion, daemon=True, name="bewegung").start()
 
         def read_err():
             for line in iter(proc.stderr.readline, b""):
@@ -982,7 +1155,7 @@ class Camera(threading.Thread):
             self.state = "fehler"
             self.message = hint or err_lines[-1][:160]
             self.detail = err[-1200:]
-            log("KAMERA", "ffmpeg: %s" % (err_lines[-1][:200]))
+            log(self.tag, "ffmpeg: %s" % (err_lines[-1][:200]))
         elif proc.returncode not in (0, None) and self.state != "fehler":
             self.state, self.message = "fehler", "ffmpeg beendet (Code %s)" % proc.returncode
         if self.state == "laeuft":
@@ -1021,7 +1194,15 @@ class Camera(threading.Thread):
                 pass
 
 
-CAMERA = None
+CAMERAS = {}       # 1 = primär, 2 = sekundär
+
+
+def cam_by_query(q):
+    try:
+        n = int(q.get("cam", "1"))
+    except ValueError:
+        n = 1
+    return CAMERAS.get(n) or CAMERAS[1]
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1275,6 +1456,9 @@ def site_client_config(n):
         "repeat_ms": CFG["oeffner.wiederholung_ms"],
         "cam": cc["kamera_typ"] != "aus" and bool(cc["kamera_url"].strip()),
         "bildmodus": cc["bildmodus"], "fps": cc["bilder_pro_sekunde"],
+        "cam2": cam_cfg("kamera2")["kamera_typ"] != "aus" and bool(cam_cfg("kamera2")["kamera_url"].strip()),
+        "cam2_bildmodus": cam_cfg("kamera2")["bildmodus"], "cam2_fps": cam_cfg("kamera2")["bilder_pro_sekunde"],
+        "bewegung": bool(CFG["bewegung.aktiv"]) and cc["kamera_typ"] == "rtsp",
         "bells": [{"id": b["id"], "name": b["name"]} for b in site_bells(n)],
     }
 
@@ -1466,7 +1650,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _site_get(self, n):
         p = self._route()
-        cam = CAMERA
+        cam = cam_by_query(self._query())
         if p in ("/", "/index.html"):
             cfg = site_client_config(n)
             html = template("dashboard.html")
@@ -1538,9 +1722,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(out)
         if p == "/api/status":
             return self._json(system_status())
-        m = re.match(r"^/cam(?:/\d+)?/(stream\.mjpg|snapshot\.jpg)$", p)
+        m = re.match(r"^/cam(?:/(\d+))?/(stream\.mjpg|snapshot\.jpg)$", p)
         if m:
-            return self._mjpeg(CAMERA) if m.group(1) == "stream.mjpg" else self._snapshot(CAMERA)
+            cam = CAMERAS.get(int(m.group(1) or 1)) or CAMERAS[1]
+            return self._mjpeg(cam) if m.group(2) == "stream.mjpg" else self._snapshot(cam)
         if p == "/favicon.ico":
             return self._send(204, b"")
         self._send(404, "Nicht gefunden")
@@ -1562,9 +1747,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if p == "/api/test_cam":
             vals = data.get("values") or {}
+            sec = "kamera2" if str(data.get("cam", "1")) == "2" else "kamera"
             cam = {}
             for f in SCHEMA:
-                if f["sec"] != "kamera":
+                if f["sec"] != sec:
                     continue
                 k = fid(f)
                 v = vals.get(k, CFG[k])
@@ -1725,9 +1911,10 @@ def validate_settings(data):
             errors.append("Außentemperatur: Breiten- und Längengrad als Zahl angeben (z. B. 53.55 / 9.99) oder beide leer lassen")
     if new["wetter.aktiv"] and not (la and lo) and not new["wetter.ort"].strip():
         errors.append("Außentemperatur: Ort oder Koordinaten eintragen (oder Anzeige ausschalten)")
-    u = new["kamera.kamera_url"].strip().lower()
-    if new["kamera.kamera_typ"] == "jpeg" and u and not u.startswith(("http://", "https://")):
-        errors.append("Kamera: Standbild-URL muss mit http:// beginnen")
+    for sec, name in (("kamera", "Primäre Kamera"), ("kamera2", "Sekundäre Kamera")):
+        u = new[sec + ".kamera_url"].strip().lower()
+        if new[sec + ".kamera_typ"] == "jpeg" and u and not u.startswith(("http://", "https://")):
+            errors.append("%s: Standbild-URL muss mit http:// beginnen" % name)
     return new, ("; ".join(errors) if errors else "")
 
 
@@ -1736,7 +1923,8 @@ def system_status():
         "name": APP_NAME, "version": APP_VERSION, "uptime_s": int(time.time() - START_TIME),
         "mqtt": bool(MQTT and MQTT.connected), "mqtt_state": MQTT.state if MQTT else "-",
         "ffmpeg": FFMPEG, "ips": local_ips(), "ports": all_ports(),
-        "cam": CAMERA.status(),
+        "cam": CAMERAS[1].status(),
+        "cam2": CAMERAS[2].status(),
         "wetter": weather_public(),
         "titles": {str(n): CFG["dashboard%d.titel" % n] for n in range(1, NUM_SITES + 1)},
         "python": sys.version.split()[0], "config": CONFIG_PATH,
@@ -1748,10 +1936,11 @@ def system_status():
 # ═══════════════════════════════════════════════════════════════════════════
 
 def shutdown_children():
-    if CAMERA is None:
+    if not CAMERAS:
         return
-    CAMERA.stop()
-    for c in (CAMERA,):
+    for c in CAMERAS.values():
+        c.stop()
+    for c in CAMERAS.values():
         p = c.proc
         if p and p.poll() is None:
             try:
@@ -1871,7 +2060,7 @@ def on_signal(signum, frame):
 
 
 def main():
-    global MQTT, CAMERA, DOORBELL_WAV
+    global MQTT, DOORBELL_WAV
     signal.signal(signal.SIGTERM, on_signal)
     signal.signal(signal.SIGINT, on_signal)
     log("SYS", "%s v%s startet (Python %s)" % (APP_NAME, APP_VERSION, sys.version.split()[0]))
@@ -1902,8 +2091,10 @@ def main():
     threading.Thread(target=encode_doorbell, daemon=True).start()
 
     WeatherThread().start()
-    CAMERA = Camera()
-    CAMERA.start()
+    CAMERAS[1] = Camera(1, "kamera")
+    CAMERAS[2] = Camera(2, "kamera2")
+    for c in CAMERAS.values():
+        c.start()
 
     MQTT = MQTTClient(on_mqtt_message)
     MQTT.start()

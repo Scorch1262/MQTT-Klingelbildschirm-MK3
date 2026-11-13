@@ -1,4 +1,4 @@
-# Klingel-Dashboard Brume 2 – v4.3.3
+# Klingel-Dashboard Brume 2 – v4.4.0
 
 Klingel-Dashboard für den **GL.iNet Brume 2 (GL-MT2500)**. Es läuft im Autostart der
 Brume und ersetzt den PC (v2.x) bzw. das RP2350-Board (v3.x):
@@ -42,15 +42,15 @@ Kommt im Browser trotzdem kein Video an, wechselt das Dashboard automatisch auf
 
 ## Installation
 
-1. Die Datei `klingel-dashboard-brume2_v4.3.3.sh` auf die Brume kopieren,
+1. Die Datei `klingel-dashboard-brume2_v4.4.0.sh` auf die Brume kopieren,
    z. B. mit WinSCP (Protokoll SCP, Benutzer `root`) nach `/root/` oder per
    ```
-   scp -O klingel-dashboard-brume2_v4.3.3.sh root@<IP-der-Brume>:/root/
+   scp -O klingel-dashboard-brume2_v4.4.0.sh root@<IP-der-Brume>:/root/
    ```
 2. Per SSH auf der Brume anmelden und starten:
    ```
    ssh root@<IP-der-Brume>
-   sh /root/klingel-dashboard-brume2_v4.3.3.sh
+   sh /root/klingel-dashboard-brume2_v4.4.0.sh
    ```
 3. Der Installer
    * installiert bei Bedarf **python3** (`opkg`),
@@ -155,6 +155,34 @@ Die vollständige ffmpeg-Ausgabe zeigt der Knopf **Kamera mit diesen Werten test
 
 ---
 
+## Zweite Kamera und Bewegungsmarkierung
+
+**Sekundäre Kamera:** In der Einrichtung (Karte „Sekundäre Kamera“) einen zweiten RTSP-Stream
+eintragen und Kameraquelle auf `rtsp` stellen. Auf beiden Dashboards schaltet dann ein
+**Tippen aufs Kamerabild** zwischen Kamera 1 und Kamera 2 um; oben rechts im Bild steht,
+welche Kamera gerade läuft. **Beim Klingeln wird automatisch auf Kamera 1 (primär)
+zurückgeschaltet.** Die zweite Kamera wird nur abgerufen, solange sie angezeigt wird (+30 s).
+
+**Bewegungsmarkierung:** Verändert sich im Bild der primären Kamera ein Bereich deutlich,
+wird er mit einem **roten Rahmen** markiert. Verändert er sich eine einstellbare Zeit lang
+(Standard **5 Sekunden**) nicht mehr, verschwindet der Rahmen wieder. Einstellungen in der
+Karte „Primäre Kamera“:
+
+| Einstellung | Bedeutung |
+|---|---|
+| Bewegung im primären Bild rot markieren | an/aus |
+| Markierung entfernen nach … Sekunden | 1–120 s ohne Veränderung |
+| Empfindlichkeit | 1 = nur starke Bewegungen, 10 = schon kleine |
+
+Die Brume rechnet dafür nur mit einem 64×48-Pixel-Graustufenbild (5 Bilder/s), das derselbe
+ffmpeg-Prozess nebenbei liefert – kaum zusätzliche Last (geschätzt 2–3 % eines Kerns).
+Verglichen wird mit einem Hintergrundbild, das sich langsam anpasst: Bleibt etwas stehen
+(z. B. ein abgestelltes Paket), gehört es nach etwa 2 Sekunden zum Hintergrund, danach
+läuft die Haltezeit ab. Ein plötzlicher Helligkeitswechsel
+über mehr als die Hälfte des Bildes (Licht an, Tag/Nacht-Umschaltung der Kamera) wird ignoriert.
+Funktioniert mit Kameraquelle `rtsp` (nicht im Sparmodus empfehlenswert, da dann nur
+Schlüsselbilder ausgewertet werden).
+
 ## Außentemperatur
 
 Oben rechts im Dashboard steht die aktuelle Außentemperatur mit Wettersymbol und Ort.
@@ -233,6 +261,12 @@ ist. Für Ton bei gesperrtem iPad: Lautlos-Schalter aus, Seite im Vordergrund la
 ---
 
 ## Versionsverlauf
+
+* **v4.4.0** – zweite Kamera und Bewegungsmarkierung
+  * sekundärer RTSP-Stream, Umschalten per Tippen aufs Bild, beim Klingeln zurück auf Kamera 1
+  * rote Rahmen um Bereiche mit starker Veränderung im primären Bild, Entfernen nach
+    einstellbarer Zeit ohne Veränderung (Standard 5 s), Empfindlichkeit einstellbar
+  * Einrichtung: Karten für primäre und sekundäre Kamera (je Vorschau und Test)
 
 * **v4.3.3** – Autostart nur noch einmal
   * Ursache der doppelten Instanzen gefunden: `/etc/init.d/klingel-dashboard` war seit

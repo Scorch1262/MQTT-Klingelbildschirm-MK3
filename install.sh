@@ -1,6 +1,6 @@
 #!/bin/sh
 # ════════════════════════════════════════════════════════════════════
-#  Klingel-Dashboard Brume 2 – Installer v4.3.3
+#  Klingel-Dashboard Brume 2 – Installer v4.4.0
 #  für GL.iNet Brume 2 (GL-MT2500, OpenWrt / GL-Firmware 4.x)
 #
 #  Alles liegt danach in EINEM Ordner:  /root/Klingel-Dashboard
@@ -12,7 +12,7 @@
 #  Mehrfach ausführbar (Update). Eine vorhandene config.ini bleibt erhalten.
 # ════════════════════════════════════════════════════════════════════
 
-VERSION="4.3.3"
+VERSION="4.4.0"
 APP_DIR=${KLINGEL_APP_DIR:-/root/Klingel-Dashboard}
 INIT=${KLINGEL_INIT:-/etc/init.d/klingel-dashboard}
 OLD_DIR=/root/Klingel-Dashboard-Brume2          # Ordnername von v4.0.0

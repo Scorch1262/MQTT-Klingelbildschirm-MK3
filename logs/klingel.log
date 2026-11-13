@@ -252,3 +252,114 @@
 2026-11-06 [20:36:21] [MQTT] getrennt: Verbindung vom Broker geschlossen
 2026-11-06 [20:36:24] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
 2026-11-06 [20:36:40] [SYS] Beende (Signal 15)
+2026-11-13 [08:45:42] [CFG] config.ini auf aktuelle Version gebracht
+2026-11-13 [08:45:42] [SYS] Klingel-Dashboard Brume 2 v4.4.0 startet (Python 3.13.16)
+2026-11-13 [08:45:42] [SYS] Konfiguration: /tmp/claude-0/-home-claude/7bfa212c-0761-5693-952c-5c2653311de0/scratchpad/run/config.ini
+2026-11-13 [08:45:42] [FFMPEG] /usr/bin/ffmpeg (Version 6.1.1-3ubuntu5, H.264: ja, H.265: ja)
+2026-11-13 [08:45:42] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
+2026-11-13 [08:45:42] [SYS] ==========================================================
+2026-11-13 [08:45:42] [SYS] Dashboard 1:  http://192.0.2.2:8081   (Haustür)
+2026-11-13 [08:45:42] [SYS] Dashboard 2:  http://192.0.2.2:8082   (Garage)
+2026-11-13 [08:45:42] [SYS] Einrichtung:  http://192.0.2.2:8083
+2026-11-13 [08:45:42] [SYS] ==========================================================
+2026-11-13 [08:45:42] [TON] Klingelton bereit: wav, m4a, mp3
+2026-11-13 [08:45:45] [WETTER] Ort: Musterstadt, Nordrhein-Westfalen (51.5000, 7.4700)
+2026-11-13 [08:45:45] [WETTER] Musterstadt, Nordrhein-Westfalen: 12.4 °C, teils bewölkt
+2026-11-13 [08:45:46] [CFG] Einstellungen gespeichert - Neustart
+2026-11-13 [08:45:47] [SYS] Neustart ...
+2026-11-13 [08:45:47] [SYS] Klingel-Dashboard Brume 2 v4.4.0 startet (Python 3.13.16)
+2026-11-13 [08:45:47] [SYS] Konfiguration: /tmp/claude-0/-home-claude/7bfa212c-0761-5693-952c-5c2653311de0/scratchpad/run/config.ini
+2026-11-13 [08:45:47] [FFMPEG] /usr/bin/ffmpeg (Version 6.1.1-3ubuntu5, H.264: ja, H.265: ja)
+2026-11-13 [08:45:47] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
+2026-11-13 [08:45:47] [SYS] ==========================================================
+2026-11-13 [08:45:47] [SYS] Dashboard 1:  http://192.0.2.2:8081   (Haustür)
+2026-11-13 [08:45:47] [SYS] Dashboard 2:  http://192.0.2.2:8082   (Garage)
+2026-11-13 [08:45:47] [SYS] Einrichtung:  http://192.0.2.2:8083
+2026-11-13 [08:45:47] [SYS] ==========================================================
+2026-11-13 [08:45:47] [TON] Klingelton bereit: wav, m4a, mp3
+2026-11-13 [08:45:50] [WETTER] Ort: Musterstadt, Nordrhein-Westfalen (51.5000, 7.4700)
+2026-11-13 [08:45:50] [WETTER] Musterstadt, Nordrhein-Westfalen: 12.4 °C, teils bewölkt
+2026-11-13 [08:45:51] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1 (mit Bewegungserkennung)
+2026-11-13 [08:45:55] [KAMERA] Bild empfangen (960x540)
+2026-11-13 [08:45:55] [KAMERA2] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/cam2
+2026-11-13 [08:45:59] [KAMERA2] Bild empfangen (960x540)
+2026-11-13 [08:46:19] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1 (mit Bewegungserkennung)
+2026-11-13 [08:46:19] [KAMERA] ffmpeg: Error opening input files: Server returned 404 Not Found
+2026-11-13 [08:46:21] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1 (mit Bewegungserkennung)
+2026-11-13 [08:46:23] [KAMERA] Bild empfangen (960x540)
+2026-11-13 [08:46:50] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1 (mit Bewegungserkennung)
+2026-11-13 [08:46:50] [KAMERA] ffmpeg: Error opening input files: Server returned 404 Not Found
+2026-11-13 [08:46:52] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1 (mit Bewegungserkennung)
+2026-11-13 [08:46:54] [KAMERA] Bild empfangen (960x540)
+2026-11-13 [08:47:13] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1 (mit Bewegungserkennung)
+2026-11-13 [08:47:16] [KAMERA] Bild empfangen (960x540)
+2026-11-13 [08:47:34] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1 (mit Bewegungserkennung)
+2026-11-13 [08:47:34] [KAMERA] ffmpeg: Error opening input files: Server returned 404 Not Found
+2026-11-13 [08:47:36] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1 (mit Bewegungserkennung)
+2026-11-13 [08:47:39] [KAMERA] Bild empfangen (960x540)
+2026-11-13 [08:48:20] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1 (mit Bewegungserkennung)
+2026-11-13 [08:48:20] [KAMERA] ffmpeg: Error opening input files: Server returned 404 Not Found
+2026-11-13 [08:48:22] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1 (mit Bewegungserkennung)
+2026-11-13 [08:48:26] [KAMERA] Bild empfangen (960x540)
+2026-11-13 [08:48:27] [IPAD1] 127.0.0.1: AUDIO Diagnose: WebAudio vorhanden, AAC "", MP3 "probably", WAV "maybe" | Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36
+2026-11-13 [08:48:31] [IPAD1] 127.0.0.1: AUDIO Datei-Ton freigegeben (/klingel.mp3)
+2026-11-13 [08:48:32] [IPAD1] 127.0.0.1: AUDIO WebAudio aktiv
+2026-11-13 [08:48:35] [KAMERA2] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/cam2
+2026-11-13 [08:48:39] [KAMERA2] Bild empfangen (960x540)
+2026-11-13 [08:48:40] [MQTT] <- doorbell/bell1: RING
+2026-11-13 [08:48:40] [KLINGEL] Dashboard 1 / Klingel 1 (MQTT doorbell/bell1)
+2026-11-13 [08:48:42] [IPAD1] 127.0.0.1: AUDIO Klingel: Ton läuft (/klingel.mp3)
+2026-11-13 [08:49:33] [SYS] Beende (Signal 15)
+2026-11-13 [08:49:34] [SYS] Klingel-Dashboard Brume 2 v4.4.0 startet (Python 3.13.16)
+2026-11-13 [08:49:34] [SYS] Konfiguration: /tmp/claude-0/-home-claude/7bfa212c-0761-5693-952c-5c2653311de0/scratchpad/run/config.ini
+2026-11-13 [08:49:34] [FFMPEG] /usr/bin/ffmpeg (Version 6.1.1-3ubuntu5, H.264: ja, H.265: ja)
+2026-11-13 [08:49:34] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
+2026-11-13 [08:49:34] [SYS] ==========================================================
+2026-11-13 [08:49:34] [SYS] Dashboard 1:  http://192.0.2.2:8081   (Haustür)
+2026-11-13 [08:49:34] [SYS] Dashboard 2:  http://192.0.2.2:8082   (Garage)
+2026-11-13 [08:49:34] [SYS] Einrichtung:  http://192.0.2.2:8083
+2026-11-13 [08:49:34] [SYS] ==========================================================
+2026-11-13 [08:49:34] [TON] Klingelton bereit: wav, m4a, mp3
+2026-11-13 [08:49:37] [WETTER] Ort: Musterstadt, Nordrhein-Westfalen (51.5000, 7.4700)
+2026-11-13 [08:49:37] [WETTER] Musterstadt, Nordrhein-Westfalen: 12.4 °C, teils bewölkt
+2026-11-13 [08:49:40] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1 (mit Bewegungserkennung)
+2026-11-13 [08:49:44] [KAMERA] Bild empfangen (960x540)
+2026-11-13 [08:49:53] [IPAD1] 127.0.0.1: AUDIO Diagnose: WebAudio vorhanden, AAC "", MP3 "probably", WAV "maybe" | Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36
+2026-11-13 [08:49:56] [IPAD1] 127.0.0.1: AUDIO Datei-Ton freigegeben (/klingel.mp3)
+2026-11-13 [08:49:56] [IPAD1] 127.0.0.1: AUDIO WebAudio aktiv
+2026-11-13 [08:50:21] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1 (mit Bewegungserkennung)
+2026-11-13 [08:50:21] [KAMERA] ffmpeg: Error opening input files: Server returned 404 Not Found
+2026-11-13 [08:50:23] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1 (mit Bewegungserkennung)
+2026-11-13 [08:50:25] [KAMERA] Bild empfangen (960x540)
+2026-11-13 [08:50:26] [IPAD1] 127.0.0.1: AUDIO Diagnose: WebAudio vorhanden, AAC "", MP3 "probably", WAV "maybe" | Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36
+2026-11-13 [08:50:29] [IPAD1] 127.0.0.1: AUDIO Datei-Ton freigegeben (/klingel.mp3)
+2026-11-13 [08:50:30] [IPAD1] 127.0.0.1: AUDIO WebAudio aktiv
+2026-11-13 [08:51:11] [SYS] Beende (Signal 15)
+2026-11-13 [08:51:12] [SYS] Klingel-Dashboard Brume 2 v4.4.0 startet (Python 3.13.16)
+2026-11-13 [08:51:12] [SYS] Konfiguration: /tmp/claude-0/-home-claude/7bfa212c-0761-5693-952c-5c2653311de0/scratchpad/run/config.ini
+2026-11-13 [08:51:12] [FFMPEG] /usr/bin/ffmpeg (Version 6.1.1-3ubuntu5, H.264: ja, H.265: ja)
+2026-11-13 [08:51:12] [SYS] ==========================================================
+2026-11-13 [08:51:12] [SYS] Dashboard 1:  http://192.0.2.2:8081   (Haustür)
+2026-11-13 [08:51:12] [SYS] Dashboard 2:  http://192.0.2.2:8082   (Garage)
+2026-11-13 [08:51:12] [SYS] Einrichtung:  http://192.0.2.2:8083
+2026-11-13 [08:51:12] [SYS] ==========================================================
+2026-11-13 [08:51:12] [MQTT] verbunden mit 127.0.0.1:1883, abonniert: doorbell/bell1, doorbell/bell2
+2026-11-13 [08:51:13] [TON] Klingelton bereit: wav, m4a, mp3
+2026-11-13 [08:51:15] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1 (mit Bewegungserkennung)
+2026-11-13 [08:51:15] [WETTER] Ort: Musterstadt, Nordrhein-Westfalen (51.5000, 7.4700)
+2026-11-13 [08:51:15] [WETTER] Musterstadt, Nordrhein-Westfalen: 12.4 °C, teils bewölkt
+2026-11-13 [08:51:16] [KAMERA] Bild empfangen (960x540)
+2026-11-13 [08:51:57] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1 (mit Bewegungserkennung)
+2026-11-13 [08:51:59] [KAMERA] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/stream1 (mit Bewegungserkennung)
+2026-11-13 [08:52:01] [KAMERA] Bild empfangen (960x540)
+2026-11-13 [08:52:01] [IPAD1] 127.0.0.1: AUDIO Diagnose: WebAudio vorhanden, AAC "", MP3 "probably", WAV "maybe" | Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36
+2026-11-13 [08:52:06] [IPAD1] 127.0.0.1: AUDIO Datei-Ton freigegeben (/klingel.mp3)
+2026-11-13 [08:52:07] [IPAD1] 127.0.0.1: AUDIO WebAudio aktiv
+2026-11-13 [08:52:11] [KAMERA2] starte ffmpeg: rtsp://kamera:***@127.0.0.1:8554/cam2
+2026-11-13 [08:52:13] [KAMERA2] Bild empfangen (960x540)
+2026-11-13 [08:52:15] [MQTT] <- doorbell/bell1: RING
+2026-11-13 [08:52:15] [KLINGEL] Dashboard 1 / Klingel 1 (MQTT doorbell/bell1)
+2026-11-13 [08:52:17] [IPAD1] 127.0.0.1: AUDIO Klingel: Ton läuft (/klingel.mp3)
+2026-11-13 [08:52:40] [IPAD1] 127.0.0.1: AUDIO Diagnose: WebAudio vorhanden, AAC "", MP3 "probably", WAV "maybe" | Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36
+2026-11-13 [08:52:43] [IPAD1] 127.0.0.1: AUDIO Datei-Ton freigegeben (/klingel.mp3)
+2026-11-13 [08:52:44] [IPAD1] 127.0.0.1: AUDIO WebAudio aktiv
