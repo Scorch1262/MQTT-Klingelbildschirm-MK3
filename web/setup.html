@@ -66,6 +66,33 @@ a { color: #ff9142; }
 .preview .pv-txt { position: absolute; top: 0; left: 0; right: 0; bottom: 0; padding: 16px; font-size: 11px; color: #8891a0; text-align: center;
   display: -webkit-box; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; }
 .camstate { font-size: 11px; margin-bottom: 10px; line-height: 1.5; }
+/* Aktivitäten-Protokoll */
+.ev-bar { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap;
+  -webkit-align-items: center; align-items: center; margin-bottom: 10px; }
+.chip { font-size: 11px; color: #8891a0; background: #0a0c0f; border: 1px solid #242a33; border-radius: 20px;
+  padding: 5px 11px; margin: 0 6px 6px 0; cursor: pointer; -webkit-user-select: none; user-select: none; }
+.chip b { color: #e5e8ec; font-weight: 600; margin-left: 4px; }
+.chip.on { color: #0a0c0f; background: #ff9142; border-color: #ff9142; }
+.chip.on b { color: #0a0c0f; }
+.ev-tools { margin-left: auto; font-size: 11px; color: #8891a0; }
+.ev-tools label { cursor: pointer; margin-left: 12px; }
+.ev-tools input { vertical-align: middle; margin-right: 4px; }
+#evSave { color: #ff9142; border: 1px solid #ff9142; border-radius: 20px; padding: 4px 10px; }
+.ev-list { max-height: 440px; overflow-y: auto; -webkit-overflow-scrolling: touch; border: 1px solid #242a33;
+  border-radius: 8px; background: #0a0c0f; }
+.ev { display: -webkit-box; display: -webkit-flex; display: flex; padding: 6px 10px; border-bottom: 1px solid #161a20;
+  font-size: 12px; line-height: 1.45; }
+.ev:last-child { border-bottom: 0; }
+.ev .tm { color: #8891a0; width: 74px; -webkit-flex-shrink: 0; flex-shrink: 0; }
+.ev .ct { width: 96px; -webkit-flex-shrink: 0; flex-shrink: 0; font-size: 10px; letter-spacing: 0.05em;
+  text-transform: uppercase; padding-top: 2px; }
+.ev .tx { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; word-break: break-word; color: #c9ced6; }
+.ev.ok .tx { color: #3ddc97; } .ev.err .tx { color: #ff5d5d; } .ev.warn .tx { color: #ffb648; }
+.ev-empty { padding: 18px; text-align: center; font-size: 12px; color: #8891a0; }
+.c-klingel { color: #ffb648; } .c-bewegung { color: #ff6b6b; } .c-oeffner { color: #ff9142; }
+.c-kamera { color: #4aa8ff; } .c-mqtt { color: #b48cff; } .c-audio { color: #3ddc97; }
+.c-wetter { color: #7fd1e8; } .c-system { color: #8891a0; }
+@media (max-width: 600px) { .ev .ct { width: 72px; } .ev .tm { width: 62px; } .ev-tools { margin-left: 0; width: 100%; } }
 pre.logbox { display: none; white-space: pre-wrap; word-break: break-all; font-size: 10px; color: #8891a0; background: #0a0c0f; border: 1px solid #242a33; border-radius: 6px; padding: 8px; max-height: 160px; overflow: auto; margin-bottom: 10px; }
 
 button.btn { background: #171b21; color: #e5e8ec; border: 1px solid #242a33; border-radius: 8px; padding: 9px 14px; font-size: 11px; font-weight: 600;
@@ -92,6 +119,13 @@ button.mini { padding: 8px 0; width: 100%; font-size: 10px; }
   <div class="card">
     <div class="card-head"><span class="card-title">Gerätestatus · Brume 2</span><span class="card-title mono" id="uptime"></span></div>
     <div class="card-body kv mono" id="status">lade …</div>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title">Aktivitäten seit dem Start</span><span class="card-title mono" id="evInfo"></span></div>
+    <div class="card-body">
+      <div class="ev-bar mono" id="evBar"></div>
+      <div class="ev-list mono" id="evList"><div class="ev-empty">lade …</div></div>
+    </div>
   </div>
   <div class="grid">
     <div class="col" id="colA"></div>
@@ -226,6 +260,79 @@ function collect() {
   return o;
 }
 
+/* ── Aktivitäten-Protokoll ── */
+var EV = [], evLast = 0, evBoot = '', evCats = {}, evCounts = {}, evFilter = 'alle', evStart = 0, evNow = 0, evFirst = 0;
+var evPaused = false;
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+function evTime(t) {
+  var d = new Date(t * 1000), today = new Date();
+  var hm = pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+  if (d.toDateString() === today.toDateString()) return hm;
+  return pad2(d.getDate()) + '.' + pad2(d.getMonth() + 1) + '. ' + hm;
+}
+function loadEvents() {
+  if (evPaused) return;
+  req('GET', '/api/events?since=' + evLast + '&t=' + new Date().getTime(), null, function (d) {
+    if (!d) return;
+    if (d.boot !== evBoot) {
+      var restarted = evBoot !== '' && evLast > 0;
+      EV = []; evBoot = d.boot;
+      if (restarted) { evLast = 0; loadEvents(); return; }      /* Dienst neu gestartet: neu laden */
+    }
+    evCats = d.cats; evCounts = d.counts; evStart = d.start; evNow = d.now; evFirst = d.first;
+    for (var i = 0; i < d.events.length; i++) { EV.push(d.events[i]); evLast = d.events[i].id; }
+    if (EV.length > 5000) EV = EV.slice(EV.length - 5000);
+    renderEvents(d.events.length > 0 || !evRendered);
+  });
+}
+var evRendered = false;
+function renderEvents(listChanged) {
+  var total = 0, k, h = '';
+  for (k in evCounts) if (evCounts.hasOwnProperty(k)) total += evCounts[k];
+  h += '<span class="chip' + (evFilter === 'alle' ? ' on' : '') + '" data-f="alle">Alle<b>' + total + '</b></span>';
+  for (k in evCats) {
+    if (!evCats.hasOwnProperty(k)) continue;
+    h += '<span class="chip' + (evFilter === k ? ' on' : '') + '" data-f="' + k + '">' + esc(evCats[k]) + '<b>' + (evCounts[k] || 0) + '</b></span>';
+  }
+  h += '<span class="ev-tools"><label><input type="checkbox" id="evPause"' + (evPaused ? ' checked' : '') + '>anhalten</label>' +
+       '<label id="evSave">als Text speichern</label></span>';
+  $('evBar').innerHTML = h;
+  var chips = $('evBar').querySelectorAll('.chip');
+  for (var c = 0; c < chips.length; c++) chips[c].onclick = function () { evFilter = this.getAttribute('data-f'); renderEvents(true); };
+  $('evPause').onchange = function () { evPaused = this.checked; if (!evPaused) loadEvents(); };
+  $('evSave').onclick = saveEvents;
+  var up = Math.max(0, evNow - evStart);
+  $('evInfo').innerHTML = 'seit ' + evTime(evStart) + ' · ' + fmtUp(up).replace('Laufzeit ', '') +
+    (evFirst > 1 ? ' · ältere Einträge entfernt' : '');
+  if (!listChanged) return;              /* Liste nur bei neuen Einträgen neu aufbauen (Scrollposition bleibt) */
+  evRendered = true;
+  var rows = [];
+  for (var i = EV.length - 1; i >= 0 && rows.length < 1500; i--) {
+    var e = EV[i];
+    if (evFilter !== 'alle' && e.cat !== evFilter) continue;
+    rows.push('<div class="ev ' + e.lvl + '"><span class="tm">' + evTime(e.t) + '</span><span class="ct c-' + e.cat + '">' +
+      esc(evCats[e.cat] || e.cat) + '</span><span class="tx">' + esc(e.text) + '</span></div>');
+  }
+  $('evList').innerHTML = rows.length ? rows.join('') : '<div class="ev-empty">Noch keine Einträge' + (evFilter !== 'alle' ? ' in dieser Kategorie' : '') + '.</div>';
+}
+function saveEvents() {
+  var lines = ['Klingel-Dashboard – Aktivitäten seit ' + evTime(evStart), ''];
+  for (var i = 0; i < EV.length; i++) {
+    var e = EV[i];
+    if (evFilter !== 'alle' && e.cat !== evFilter) continue;
+    var d = new Date(e.t * 1000);
+    lines.push(d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' + evTime(e.t).slice(-8) +
+      '  ' + (evCats[e.cat] || e.cat) + '  ' + e.text);
+  }
+  var txt = lines.join('\r\n');
+  try {
+    var a = document.createElement('a');
+    a.href = (window.URL || window.webkitURL).createObjectURL(new Blob([txt], { type: 'text/plain;charset=utf-8' }));
+    a.download = 'klingel-aktivitaeten.txt';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  } catch (e) { window.open('data:text/plain;charset=utf-8,' + encodeURIComponent(txt)); }
+}
+
 /* ── Status ── */
 function wxStatus(w) {
   if (!w || !w.aktiv) return '<span class="dim">aus</span>';
@@ -353,6 +460,7 @@ req('GET', '/api/schema', null, function (s) {
   req('GET', '/api/settings', null, function (d) {
     fill(d);
     loadStatus(); setInterval(loadStatus, 3000);
+    loadEvents(); setInterval(loadEvents, 2000);
     previewLoop(1); previewLoop(2);
   }, function (e) { setMsg('Einstellungen nicht ladbar: ' + e, 'err'); });
 }, function (e) { setMsg('Brume nicht erreichbar: ' + e, 'err'); });

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Klingel-Dashboard Brume 2  –  v4.4.0
+Klingel-Dashboard Brume 2  –  v4.5.0
 ====================================
 
 Laeuft auf einem GL.iNet Brume 2 (GL-MT2500, OpenWrt) im Autostart und stellt bereit:
@@ -38,7 +38,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
 APP_NAME = "Klingel-Dashboard Brume 2"
-APP_VERSION = "4.4.0"
+APP_VERSION = "4.5.0"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get("KLINGEL_CONFIG") or os.path.join(BASE_DIR, "config.ini")
@@ -73,6 +73,39 @@ def log(tag, msg):
                 fh.write(time.strftime("%Y-%m-%d ") + line)
         except OSError:
             pass
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#   Aktivitäten-Protokoll (nur im Arbeitsspeicher, aktuelle Laufzeit)
+# ═══════════════════════════════════════════════════════════════════════════
+
+import collections
+
+EVENTS = collections.deque(maxlen=5000)       # ältere Einträge fallen heraus
+EVENT_LOCK = threading.Lock()
+EVENT_SEQ = [0]
+EVENT_COUNT = collections.Counter()           # je Kategorie seit Start (auch herausgefallene)
+EVENT_CATS = {
+    "klingel": "Klingel", "bewegung": "Bewegung", "oeffner": "Türöffner", "kamera": "Kamera",
+    "mqtt": "MQTT", "audio": "Audio/iPad", "wetter": "Wetter", "system": "System",
+}
+
+
+def event(cat, text, level="info"):
+    """Aktivität merken (für die Einrichtungsseite). level: info | ok | warn | err"""
+    with EVENT_LOCK:
+        EVENT_SEQ[0] += 1
+        EVENTS.append({"id": EVENT_SEQ[0], "t": round(time.time(), 1), "cat": cat, "lvl": level,
+                       "text": str(text)[:300]})
+        EVENT_COUNT[cat] += 1
+
+
+def events_since(since, limit=1000):
+    with EVENT_LOCK:
+        out = [e for e in EVENTS if e["id"] > since]
+        first = EVENTS[0]["id"] if EVENTS else 0
+        counts = dict(EVENT_COUNT)
+    return out[-limit:], first, counts
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -333,6 +366,13 @@ def site_cfg(n):
     return {k[len(p):]: v for k, v in CFG.items() if k.startswith(p)}
 
 
+OPENER = {}     # Dashboard -> {"start", "last"} für das Aktivitäten-Protokoll
+
+
+def site_title(n):
+    return CFG.get("dashboard%d.titel" % n) or ("Dashboard %d" % n)
+
+
 def site_bells(n):
     sc = site_cfg(n)
     out = []
@@ -395,6 +435,7 @@ class MQTTClient(threading.Thread):
         self.pkt_id = 1
         self._t_ok = 0.0
         self.quick_drops = 0
+        self.last_err = ""
 
     # -- Hilfen --------------------------------------------------------------
     def _send(self, data):
@@ -452,6 +493,7 @@ class MQTTClient(threading.Thread):
                 if t_conn[0] and time.time() - t_conn[0] < 20:
                     self.quick_drops += 1
                     if self.quick_drops == 3:
+                        event("mqtt", "Broker trennt immer kurz nach der Anmeldung – doppelte Client-ID?", "warn")
                         log("MQTT", "HINWEIS: Broker trennt immer kurz nach der Anmeldung. Meist nutzt ein "
                                     "anderes Gerät/Programm dieselbe Client-ID '%s' – in der Einrichtung "
                                     "eine eindeutige Client-ID eintragen." % CFG["mqtt.client_id"])
@@ -464,8 +506,11 @@ class MQTTClient(threading.Thread):
                     msg = "Verbindung abgelehnt (Port/Broker prüfen)"
                 elif isinstance(e, socket.gaierror):
                     msg = "Hostname nicht auflösbar"
-                if self.connected or not self.state.startswith("Fehler"):
+                if self.connected or msg != self.last_err:
+                    # gleiche Meldung bei jedem Wiederholversuch nur einmal (bis zur nächsten Verbindung)
                     log("MQTT", "getrennt: %s" % msg)
+                    event("mqtt", ("Verbindung getrennt: %s" if self.connected else "keine Verbindung: %s") % msg, "err")
+                    self.last_err = msg
                 self.state = "Fehler: %s" % msg
             finally:
                 self.connected = False
@@ -510,10 +555,12 @@ class MQTTClient(threading.Thread):
             sb = struct.pack("!H", pid) + b"".join(_mqtt_str(t) + b"\x00" for t in tops)
             self._send(b"\x82" + _mqtt_len(len(sb)) + sb)
         self.connected = True
+        self.last_err = ""
         self.state = "verbunden mit %s:%d" % (host, port)
         self._t_ok = time.time()
         self.last_rx = time.time()
         log("MQTT", "%s, abonniert: %s" % (self.state, ", ".join(tops) or "-"))
+        event("mqtt", "%s" % self.state.replace("verbunden mit", "verbunden mit Broker"), "ok")
         s.settimeout(1.0)
         while not self.stop_evt.is_set():
             try:
@@ -592,6 +639,8 @@ def ring(site, bell, reason):
         BELL_COUNT[(site, bell)] = BELL_COUNT.get((site, bell), 0) + 1
         BELL_UNTIL[(site, bell)] = time.time() + BELL_ACTIVE_S
     log("KLINGEL", "Dashboard %d / Klingel %d (%s)" % (site, bell, reason))
+    title = CFG.get("dashboard%d.titel" % site) or ("Dashboard %d" % site)
+    event("klingel", "%s klingelt (%s)" % (title, reason), "warn")
 
 
 def on_mqtt_message(topic, payload):
@@ -1345,6 +1394,10 @@ class WeatherThread(threading.Thread):
                         WEATHER["ok"] = False
                         WEATHER["msg"] = msg
                     log("WETTER", "Fehler: %s" % msg)
+                    if WEATHER.get("_err") != msg:
+                        event("wetter", "Abruf fehlgeschlagen: %s" % msg, "err")
+                    with WEATHER_LOCK:
+                        WEATHER["_err"] = msg
                     wait = min(wait, 120)      # bei Fehler bald erneut
             time.sleep(wait)
 
@@ -1363,6 +1416,7 @@ class WeatherThread(threading.Thread):
             WEATHER.update({"ok": True, "msg": "", "ort": name, "stand": time.time()})
         if first:
             log("WETTER", "%s: %.1f °C, %s" % (name, w["temp"], w["text"]))
+            event("wetter", "%s: %.1f °C, %s" % (name, w["temp"], w["text"]), "ok")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1691,14 +1745,35 @@ class Handler(BaseHTTPRequestHandler):
             ln = min(int(self.headers.get("Content-Length") or 0), 2000)
             txt = self.rfile.read(ln).decode("utf-8", "replace").replace("\n", " ") if ln > 0 else ""
             log("IPAD%d" % n, "%s: %s" % (self.client_address[0], txt[:400]))
+            short = txt.split(" | Mozilla")[0]
+            if not short.startswith("AUDIO Diagnose"):
+                cat = "kamera" if short.startswith("CAM ") else "audio"
+                body = short.split(" ", 1)[1] if " " in short else short
+                lvl = "err" if ("KEIN TON" in short or "abgelehnt" in short or "gesperrt" in short
+                                or "Fehler" in short) else ("ok" if ("läuft" in short or "freigegeben" in short
+                                                                    or "aktiv" in short) else "info")
+                event(cat, "Dashboard %d (%s): %s" % (n, self.client_address[0], body), lvl)
             return self._json({"ok": True})
         if p in ("/api/press", "/mqtt/press"):
             ok = MQTT.publish(CFG["oeffner.topic_druecken"], CFG["oeffner.payload_druecken"])
+            now = time.time()
+            st = OPENER.setdefault(n, {"start": 0.0, "last": 0.0})
+            if now - st["last"] > 3:            # Wiederholungen beim Halten nicht einzeln aufzählen
+                st["start"] = now
+                event("oeffner", "%s: Öffner gedrückt (%s)%s" % (site_title(n), self.client_address[0],
+                                                                "" if ok else " – NICHT gesendet, MQTT getrennt"),
+                      "warn" if ok else "err")
+            st["last"] = now
             return self._json({"ok": ok, "mqtt": MQTT.connected})
         if p in ("/api/release", "/mqtt/release"):
             ok = True
             if CFG["oeffner.topic_loslassen"]:
                 ok = MQTT.publish(CFG["oeffner.topic_loslassen"], CFG["oeffner.payload_loslassen"])
+            st = OPENER.get(n)
+            if st and st["start"]:
+                event("oeffner", "%s: Öffner losgelassen nach %s s" % (site_title(n), ("%.1f" % (time.time() - st["start"])).replace(".", ",")))
+                st["start"] = 0.0
+                st["last"] = 0.0
             return self._json({"ok": ok, "mqtt": MQTT.connected})
         self._send(404, "Nicht gefunden")
 
@@ -1720,6 +1795,14 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     out[fid(f)] = v
             return self._json(out)
+        if p == "/api/events":
+            try:
+                since = int(self._query().get("since", "0"))
+            except ValueError:
+                since = 0
+            ev, first, counts = events_since(since)
+            return self._json({"events": ev, "first": first, "counts": counts, "cats": EVENT_CATS,
+                               "start": round(START_TIME, 1), "boot": BOOT_ID, "now": round(time.time(), 1)})
         if p == "/api/status":
             return self._json(system_status())
         m = re.match(r"^/cam(?:/(\d+))?/(stream\.mjpg|snapshot\.jpg)$", p)
@@ -1742,6 +1825,7 @@ class Handler(BaseHTTPRequestHandler):
             except OSError as e:
                 return self._json({"ok": False, "error": "Speichern fehlgeschlagen: %s" % e}, 500)
             log("CFG", "Einstellungen gespeichert - Neustart")
+            event("system", "Einstellungen gespeichert – Dienst startet neu (Protokoll beginnt neu)", "warn")
             self._json({"ok": True, "restart": True})
             schedule_restart()
             return
@@ -1918,6 +2002,68 @@ def validate_settings(data):
     return new, ("; ".join(errors) if errors else "")
 
 
+class ActivityMonitor(threading.Thread):
+    """Beobachtet Kameras und Bewegungserkennung und schreibt Zustandswechsel ins Protokoll."""
+
+    def __init__(self):
+        threading.Thread.__init__(self, daemon=True, name="aktivitaet")
+        self.cam_state = {}
+        self.motion_on = False
+        self.motion_start = 0.0
+        self.motion_area = 0.0
+
+    def run(self):
+        while True:
+            time.sleep(0.5)
+            try:
+                self.check()
+            except Exception as e:  # noqa
+                log("SYS", "Aktivitätsmonitor: %s" % e)
+
+    def check(self):
+        for n, cam in CAMERAS.items():
+            st = cam.status()
+            key = (st["state"], st["msg"] if st["state"] == "fehler" else "")
+            if self.cam_state.get(n) != key:
+                old = self.cam_state.get(n)
+                self.cam_state[n] = key
+                name = "Kamera %d" % n
+                if st["state"] == "laeuft":
+                    event("kamera", "%s: Bild läuft (%dx%d)" % (name, st["w"], st["h"]), "ok")
+                elif st["state"] == "fehler":
+                    event("kamera", "%s: %s" % (name, st["msg"] or "Fehler"), "err")
+                elif st["state"] == "ruht" and old is not None and old[0] == "laeuft":
+                    event("kamera", "%s: abgeschaltet (kein Dashboard zeigt sie an)" % name)
+        cam = CAMERAS.get(1)
+        boxes = cam.status().get("boxes") if cam else None
+        now = time.time()
+        if boxes:
+            area = sum(b[2] * b[3] for b in boxes)
+            if not self.motion_on:
+                self.motion_on, self.motion_start, self.motion_area = True, now, area
+                b = max(boxes, key=lambda x: x[2] * x[3])
+                event("bewegung", "Bewegung erkannt (%s, %d %% des Bildes)" % (
+                    where(b[0] + b[2] / 2, b[1] + b[3] / 2), round(area * 100)), "warn")
+            self.motion_area = max(self.motion_area, area)
+        elif self.motion_on:
+            self.motion_on = False
+            hold = CFG["bewegung.haltezeit_s"]
+            event("bewegung", "Bewegung beendet – Dauer %d s (inkl. %d s Haltezeit), max. %d %% des Bildes" % (
+                round(now - self.motion_start), hold, round(self.motion_area * 100)))
+
+
+def where(x, y):
+    v = "oben" if y < 0.34 else ("unten" if y > 0.66 else "Mitte")
+    h = "links" if x < 0.34 else ("rechts" if x > 0.66 else "Mitte")
+    if v == "Mitte" and h == "Mitte":
+        return "Bildmitte"
+    if v == "Mitte":
+        return h
+    if h == "Mitte":
+        return v
+    return "%s %s" % (v, h)
+
+
 def system_status():
     return {
         "name": APP_NAME, "version": APP_VERSION, "uptime_s": int(time.time() - START_TIME),
@@ -2064,6 +2210,7 @@ def main():
     signal.signal(signal.SIGTERM, on_signal)
     signal.signal(signal.SIGINT, on_signal)
     log("SYS", "%s v%s startet (Python %s)" % (APP_NAME, APP_VERSION, sys.version.split()[0]))
+    event("system", "%s v%s gestartet" % (APP_NAME, APP_VERSION), "ok")
     log("SYS", "Konfiguration: %s" % CONFIG_PATH)
     ensure_single_instance()
 
@@ -2098,6 +2245,7 @@ def main():
 
     MQTT = MQTTClient(on_mqtt_message)
     MQTT.start()
+    ActivityMonitor().start()
 
     for srv in SERVERS:
         threading.Thread(target=srv.serve_forever, daemon=True,

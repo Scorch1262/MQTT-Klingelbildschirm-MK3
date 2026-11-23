@@ -685,6 +685,7 @@ function switchCam(n, why) {
   camLabel();
   showFrame(false); offlineText('UMSCHALTEN AUF KAMERA ' + n + ' …', '');
   addLog('CAM: Kamera ' + n + (why ? ' (' + why + ')' : ''));
+  slog('CAM auf Kamera ' + n + ' umgeschaltet' + (why ? ' (' + why + ')' : ''));
   startCam();
 }
 /* Tippen aufs Bild schaltet zwischen den Kameras um */

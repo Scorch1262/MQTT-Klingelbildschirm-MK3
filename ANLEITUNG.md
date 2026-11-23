@@ -1,4 +1,4 @@
-# Klingel-Dashboard Brume 2 – v4.4.0
+# Klingel-Dashboard Brume 2 – v4.5.0
 
 Klingel-Dashboard für den **GL.iNet Brume 2 (GL-MT2500)**. Es läuft im Autostart der
 Brume und ersetzt den PC (v2.x) bzw. das RP2350-Board (v3.x):
@@ -42,15 +42,15 @@ Kommt im Browser trotzdem kein Video an, wechselt das Dashboard automatisch auf
 
 ## Installation
 
-1. Die Datei `klingel-dashboard-brume2_v4.4.0.sh` auf die Brume kopieren,
+1. Die Datei `klingel-dashboard-brume2_v4.5.0.sh` auf die Brume kopieren,
    z. B. mit WinSCP (Protokoll SCP, Benutzer `root`) nach `/root/` oder per
    ```
-   scp -O klingel-dashboard-brume2_v4.4.0.sh root@<IP-der-Brume>:/root/
+   scp -O klingel-dashboard-brume2_v4.5.0.sh root@<IP-der-Brume>:/root/
    ```
 2. Per SSH auf der Brume anmelden und starten:
    ```
    ssh root@<IP-der-Brume>
-   sh /root/klingel-dashboard-brume2_v4.4.0.sh
+   sh /root/klingel-dashboard-brume2_v4.5.0.sh
    ```
 3. Der Installer
    * installiert bei Bedarf **python3** (`opkg`),
@@ -154,6 +154,31 @@ ffmpeg holt den Stream nur einmal ab und verteilt die Bilder an alle geöffneten
 Die vollständige ffmpeg-Ausgabe zeigt der Knopf **Kamera mit diesen Werten testen**.
 
 ---
+
+## Aktivitäten-Protokoll
+
+Auf der Einrichtungsseite (Port 8083) zeigt die Karte **„Aktivitäten seit dem Start“** alles,
+was seit dem letzten Start des Dienstes passiert ist – neueste Einträge oben, aktualisiert
+alle 2 Sekunden:
+
+| Kategorie | Einträge |
+|---|---|
+| Klingel | welches Dashboard geklingelt hat und über welches Topic (auch Testklingeln) |
+| Bewegung | Bewegung erkannt (Bereich, Anteil am Bild) und beendet (Dauer) |
+| Türöffner | gedrückt (Dashboard, iPad-Adresse) und losgelassen (Haltedauer); Warnung, wenn MQTT getrennt war |
+| Kamera | Bild läuft, Fehler, abgeschaltet; Umschalten auf Kamera 1/2 an den iPads |
+| MQTT | verbunden, getrennt, Verbindungsfehler |
+| Audio/iPad | Ton freigegeben/gesperrt, Klingelton gespielt oder nicht |
+| Wetter, System | Abruffehler; Start, gespeicherte Einstellungen |
+
+Über die Schaltflächen lässt sich nach Kategorie filtern (mit Anzahl), **anhalten** stoppt die
+Aktualisierung zum Lesen, **als Text speichern** lädt die (gefilterte) Liste als Textdatei.
+Das Protokoll liegt nur im Arbeitsspeicher (max. 5000 Einträge, schont den Flash) und beginnt
+nach jedem Neustart des Dienstes – auch nach „Speichern & Neustart“ – von vorn. Das dauerhafte
+technische Protokoll bleibt `logs/klingel.log`.
+
+Bewegung wird nur erkannt, solange die primäre Kamera läuft, also ein Dashboard sie anzeigt
+oder „Kamera dauerhaft abrufen“ eingeschaltet ist.
 
 ## Zweite Kamera und Bewegungsmarkierung
 
@@ -261,6 +286,11 @@ ist. Für Ton bei gesperrtem iPad: Lautlos-Schalter aus, Seite im Vordergrund la
 ---
 
 ## Versionsverlauf
+
+* **v4.5.0** – Aktivitäten-Protokoll in der Einrichtung
+  * alle Aktivitäten seit dem Start: Klingel, Bewegung (Beginn/Ende), Türöffner,
+    Kamera, MQTT, Audio der iPads, Wetter, System
+  * Filter nach Kategorie mit Anzahl, Anhalten, Export als Textdatei
 
 * **v4.4.0** – zweite Kamera und Bewegungsmarkierung
   * sekundärer RTSP-Stream, Umschalten per Tippen aufs Bild, beim Klingeln zurück auf Kamera 1
